@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Madhat Cutlist Calculator
  * Description: Kalkulaator hinnavahemiku, materjali valiku ja CSV ekspordiga. Seadistatav admin paneelist.
- * Version: 1.5
+ * Version: 1.6
  * Author: Veebmik
  * Author URI: https://veebmik.ee
  * Update URI: https://github.com/ratsepmarkus/madhat-calc
@@ -22,7 +22,7 @@ if (file_exists($puc_path)) {
     $myUpdateChecker = \YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
         'https://github.com/ratsepmarkus/madhat-calc',
         __FILE__,
-        'madhat-cutlist-calculator-pro'
+        'madhat-calc'
     );
     $myUpdateChecker->setBranch('main');
     $myUpdateChecker->getVcsApi()->enableReleaseAssets();
@@ -35,16 +35,17 @@ if (file_exists($puc_path)) {
 }
 
 // ---------------------------------------------------------
-// 1. ADMIN PANEELI SEADED (UUS!)
+// 1. ADMIN PANEELI SEADED
 // ---------------------------------------------------------
 
-// Registreeri seaded
+// Registreeri seaded (Email + Hinnad)
 function madhat_register_settings() {
     register_setting('madhat_options_group', 'madhat_recipient_email');
+    register_setting('madhat_options_group', 'madhat_price_min'); // UUS
+    register_setting('madhat_options_group', 'madhat_price_max'); // UUS
 }
 add_action('admin_init', 'madhat_register_settings');
 
-// Lisa menüü
 function madhat_add_admin_menu() {
     add_menu_page(
         'Madhat Kalkulaator', 
@@ -58,7 +59,6 @@ function madhat_add_admin_menu() {
 }
 add_action('admin_menu', 'madhat_add_admin_menu');
 
-// Seadete lehe HTML
 function madhat_settings_page_html() {
     ?>
     <div class="wrap">
@@ -66,15 +66,31 @@ function madhat_settings_page_html() {
         <form method="post" action="options.php">
             <?php settings_fields('madhat_options_group'); ?>
             <?php do_settings_sections('madhat_options_group'); ?>
+            
             <table class="form-table">
                 <tr valign="top">
-                    <th scope="row">E-mail, kuhu päringud saadetakse:</th>
+                    <th scope="row">E-mail päringuteks:</th>
                     <td>
                         <input type="email" name="madhat_recipient_email" value="<?php echo esc_attr(get_option('madhat_recipient_email')); ?>" class="regular-text" placeholder="nt. info@sinufirma.ee" />
-                        <p class="description">Kui jätad tühjaks, kasutatakse lehe administraatori e-maili.</p>
+                        <p class="description">Sinna saadetakse kliendi päringud ja CSV fail.</p>
+                    </td>
+                </tr>
+                
+                <tr valign="top">
+                    <th scope="row">Ruutmeetri hind (€/m²):</th>
+                    <td>
+                        <label>
+                            Min: <input type="number" name="madhat_price_min" value="<?php echo esc_attr(get_option('madhat_price_min', 45)); ?>" class="small-text" step="0.1" /> €
+                        </label>
+                        &nbsp;&nbsp;&mdash;&nbsp;&nbsp;
+                        <label>
+                            Max: <input type="number" name="madhat_price_max" value="<?php echo esc_attr(get_option('madhat_price_max', 65)); ?>" class="small-text" step="0.1" /> €
+                        </label>
+                        <p class="description">Neid numbreid kasutatakse kalkulaatoris hinnavahemiku arvutamiseks (ilma käibemaksuta).</p>
                     </td>
                 </tr>
             </table>
+            
             <?php submit_button(); ?>
         </form>
     </div>
@@ -85,6 +101,10 @@ function madhat_settings_page_html() {
 // 2. VORMI KUVAMINE
 // ---------------------------------------------------------
 function madhat_render_form() {
+    // Küsime andmebaasist hinnad (vaikimisi 45 ja 65)
+    $price_min = get_option('madhat_price_min', 45);
+    $price_max = get_option('madhat_price_max', 65);
+
     ob_start();
     ?>
     <style>
@@ -329,9 +349,9 @@ function madhat_render_form() {
     </div>
 
     <script>
-    // --- SEADISTUSED ---
-    const PRICE_MIN = 45; 
-    const PRICE_MAX = 65;
+    // --- SEADISTUSED (Tulevad nüüd PHP-st) ---
+    const PRICE_MIN = <?php echo esc_js($price_min); ?>; 
+    const PRICE_MAX = <?php echo esc_js($price_max); ?>;
     
     const SUB_TYPES = {
         'aknakile': ['Peegelkile', 'Nanokile', 'Turvakile', 'Toonkile', 'Muu'],
@@ -494,7 +514,6 @@ function madhat_handle_submit() {
     }
 
     // --- E-MAILI LOOGIKA ---
-    // Võta seadetest email. Kui seda pole, võta admini oma.
     $recipient = get_option('madhat_recipient_email', get_option('admin_email'));
     
     $headers = ['Content-Type: text/plain; charset=UTF-8', 'From: Madhat Kalkulaator <wordpress@' . $_SERVER['SERVER_NAME'] . '>'];

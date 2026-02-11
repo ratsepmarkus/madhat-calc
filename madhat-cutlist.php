@@ -1,9 +1,10 @@
 <?php
 /**
- * Plugin Name: Madhat Cutlist Calculator (Pro)
- * Description: Kalkulaator hinnavahimiku, materjali valiku ja CSV ekspordiga.
- * Version: 1.4
- * Author: Madhat
+ * Plugin Name: Madhat Cutlist Calculator
+ * Description: Kalkulaator hinnavahemiku, materjali valiku ja CSV ekspordiga. Seadistatav admin paneelist.
+ * Version: 1.5
+ * Author: Veebmik
+ * Author URI: https://veebmik.ee
  * Update URI: https://github.com/ratsepmarkus/madhat-calc
  */
 
@@ -14,96 +15,234 @@ if (!defined('ABSPATH')) {
 // ---------------------------------------------------------
 // 0. AUTOMATIC UPDATER (GitHub)
 // ---------------------------------------------------------
-// Kontrollime, kas uuendaja fail on olemas
 $puc_path = plugin_dir_path(__FILE__) . 'plugin-update-checker/plugin-update-checker.php';
 
 if (file_exists($puc_path)) {
     require_once $puc_path;
-    
-    // PARANDUS: Eemaldasime "use" ja panime siia pika nime (Fully Qualified Name)
-    // Samuti uuendasime repo lingi "madhat-calc" peale
     $myUpdateChecker = \YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
         'https://github.com/ratsepmarkus/madhat-calc',
         __FILE__,
         'madhat-cutlist-calculator-pro'
     );
-
-    // Määra haru (branch)
     $myUpdateChecker->setBranch('main');
-
-    // Tõmba zip release alt
     $myUpdateChecker->getVcsApi()->enableReleaseAssets();
-
 } else {
-    // KUI FAIL PUUDUB: Hoiatus adminile
     add_action('admin_notices', function() {
         if (current_user_can('activate_plugins')) {
-            echo '<div class="notice notice-error"><p><strong>Viga:</strong> Madhat Calculator ei leia kausta "plugin-update-checker". Automaatsed uuendused ei tööta, aga kalkulaator ise toimib.</p></div>';
+            echo '<div class="notice notice-error"><p><strong>Viga:</strong> Madhat Calculator ei leia kausta "plugin-update-checker".</p></div>';
         }
     });
 }
 
 // ---------------------------------------------------------
-// 1. VORMI KUVAMINE
+// 1. ADMIN PANEELI SEADED (UUS!)
+// ---------------------------------------------------------
+
+// Registreeri seaded
+function madhat_register_settings() {
+    register_setting('madhat_options_group', 'madhat_recipient_email');
+}
+add_action('admin_init', 'madhat_register_settings');
+
+// Lisa menüü
+function madhat_add_admin_menu() {
+    add_menu_page(
+        'Madhat Kalkulaator', 
+        'Madhat Calc', 
+        'manage_options', 
+        'madhat-settings', 
+        'madhat_settings_page_html', 
+        'dashicons-calculator', 
+        90
+    );
+}
+add_action('admin_menu', 'madhat_add_admin_menu');
+
+// Seadete lehe HTML
+function madhat_settings_page_html() {
+    ?>
+    <div class="wrap">
+        <h1>Madhat Kalkulaatori Seaded</h1>
+        <form method="post" action="options.php">
+            <?php settings_fields('madhat_options_group'); ?>
+            <?php do_settings_sections('madhat_options_group'); ?>
+            <table class="form-table">
+                <tr valign="top">
+                    <th scope="row">E-mail, kuhu päringud saadetakse:</th>
+                    <td>
+                        <input type="email" name="madhat_recipient_email" value="<?php echo esc_attr(get_option('madhat_recipient_email')); ?>" class="regular-text" placeholder="nt. info@sinufirma.ee" />
+                        <p class="description">Kui jätad tühjaks, kasutatakse lehe administraatori e-maili.</p>
+                    </td>
+                </tr>
+            </table>
+            <?php submit_button(); ?>
+        </form>
+    </div>
+    <?php
+}
+
+// ---------------------------------------------------------
+// 2. VORMI KUVAMINE
 // ---------------------------------------------------------
 function madhat_render_form() {
     ob_start();
     ?>
     <style>
+        /* Modern Reset & Wrapper */
         .madhat-wrapper { 
-            max_width: 600px;
-            margin: 0 auto; 
+            max_width: 700px;
+            margin: 40px auto; 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            padding: 20px; 
+            padding: 30px; 
             background: #ffffff; 
-            border: 1px solid #e1e4e8; 
-            border-radius: 6px; 
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            border-radius: 12px; 
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            color: #374151;
         }
-        .madhat-header { text-align: center; margin-bottom: 20px; }
-        .madhat-header h3 { margin: 0 0 5px 0; font-size: 1.2em; }
-        
-        .madhat-row { display: flex; gap: 10px; margin-bottom: 8px; align-items: flex-end; }
-        .madhat-col { flex: 1; min-width: 0; }
-        
-        .madhat-label { display: block; font-weight: 600; margin-bottom: 3px; font-size: 0.85em; color: #444; }
+        .madhat-wrapper * { box-sizing: border-box; }
+
+        .madhat-header h3 { 
+            margin: 0 0 20px 0; 
+            font-size: 1.5rem; 
+            font-weight: 700; 
+            text-align: center; 
+            color: #111827; 
+        }
+
+        /* Input Styling */
+        .madhat-label { 
+            display: block; 
+            font-weight: 600; 
+            margin-bottom: 6px; 
+            font-size: 0.9rem; 
+            color: #4b5563; 
+        }
         .madhat-input, .madhat-select, .madhat-textarea { 
-            width: 100%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; box-sizing: border-box;
+            width: 100%; 
+            padding: 10px 12px; 
+            border: 1px solid #d1d5db; 
+            border-radius: 6px; 
+            font-size: 15px; 
+            transition: border-color 0.2s, box-shadow 0.2s;
+            background-color: #f9fafb;
         }
+        .madhat-input:focus, .madhat-select:focus, .madhat-textarea:focus {
+            outline: none;
+            border-color: #2563eb;
+            background-color: #fff;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        /* Layout Grid */
+        .madhat-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+        .madhat-mb { margin-bottom: 15px; }
+
+        /* Divider */
+        .madhat-divider { height: 1px; background: #e5e7eb; margin: 25px 0; border: none; }
+
+        /* Radio Group */
+        .radio-group { 
+            display: flex; 
+            gap: 15px; 
+            background: #f3f4f6; 
+            padding: 12px; 
+            border-radius: 8px; 
+            border: 1px solid #e5e7eb;
+        }
+        .radio-label { 
+            display: flex; 
+            align-items: center; 
+            cursor: pointer; 
+            font-size: 0.95rem; 
+            font-weight: 500;
+        }
+        .radio-label input { margin-right: 8px; transform: scale(1.1); }
+
+        /* Measurements Table Style */
+        .measurements-header {
+            display: grid;
+            grid-template-columns: 2fr 2fr 1fr 3fr 40px;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+        .measurements-header label { font-size: 0.8rem; color: #6b7280; font-weight: 600; }
         
+        .item-row {
+            display: grid;
+            grid-template-columns: 2fr 2fr 1fr 3fr 40px;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: start;
+        }
+
+        /* Buttons */
         .madhat-btn { 
-            background-color: #333; color: #fff; padding: 8px 16px; border: none; 
-            cursor: pointer; border-radius: 4px; font-size: 14px; font-weight: 500; transition: background 0.2s;
+            display: inline-block;
+            padding: 10px 20px; 
+            border: none; 
+            cursor: pointer; 
+            border-radius: 6px; 
+            font-size: 15px; 
+            font-weight: 600; 
+            text-align: center;
+            transition: all 0.2s;
         }
-        .madhat-btn:hover { background-color: #555; }
-        .btn-sm { padding: 4px 10px; font-size: 12px; }
-        .btn-add { background-color: #f0f0f0; color: #333; border: 1px solid #ccc; width: 100%; margin-top: 5px; }
-        .btn-add:hover { background-color: #e6e6e6; }
-        .btn-remove { background-color: #ffeef0; color: #d73a49; border: 1px solid #d73a49; padding: 0 8px; height: 34px; display: flex; align-items: center; justify-content: center; font-weight: bold;}
+        .btn-submit { background-color: #111827; color: #fff; width: 100%; padding: 14px; margin-top: 10px; }
+        .btn-submit:hover { background-color: #000; transform: translateY(-1px); }
+        
+        .btn-add { background-color: #e5e7eb; color: #374151; width: 100%; border: 1px solid #d1d5db; }
+        .btn-add:hover { background-color: #d1d5db; }
 
-        .radio-group { display: flex; gap: 15px; background: #f8f9fa; padding: 10px; border-radius: 4px; border: 1px solid #eee; margin-bottom: 10px; }
-        .radio-label { display: flex; align-items: center; cursor: pointer; font-size: 0.95em; }
-        .radio-label input { margin-right: 6px; }
+        .btn-remove { 
+            background-color: #fee2e2; 
+            color: #ef4444; 
+            padding: 0;
+            height: 38px; /* Match input height */
+            width: 100%;
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            border: 1px solid #fecaca;
+        }
+        .btn-remove:hover { background-color: #fecaca; }
 
+        /* Summary Box */
         .madhat-summary { 
-            background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 6px; 
-            padding: 15px; margin-top: 20px; text-align: center; color: #1b5e20;
+            background: #ecfdf5; 
+            border: 1px solid #d1fae5; 
+            border-radius: 8px; 
+            padding: 20px; 
+            margin-top: 25px; 
+            text-align: center; 
+            color: #065f46;
         }
-        .price-range { font-size: 1.5em; font-weight: bold; display: block; margin: 5px 0; }
-        .price-note { font-size: 0.8em; color: #2e7d32; }
+        .price-range { font-size: 1.8rem; font-weight: 700; display: block; margin: 5px 0; color: #047857; }
+        .price-note { font-size: 0.85rem; color: #059669; text-transform: uppercase; letter-spacing: 0.5px; }
 
-        .sub-type-wrap { display: none; margin-bottom: 15px; padding: 0 5px; animation: fadeIn 0.3s; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .sub-type-wrap { display: none; margin-bottom: 15px; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
-        .madhat-alert { padding: 10px; margin-bottom: 15px; background: #d4edda; color: #155724; border-radius: 4px; font-size: 0.9em; text-align: center; }
+        .madhat-alert { padding: 15px; margin-bottom: 20px; background: #d1fae5; color: #065f46; border-radius: 8px; text-align: center; border: 1px solid #a7f3d0; }
         .madhat-honey { display: none !important; }
+
+        /* Mobile Responsive */
+        @media (max-width: 500px) {
+            .madhat-grid-2 { grid-template-columns: 1fr; }
+            .measurements-header { display: none; } /* Hide labels on mobile */
+            .item-row { grid-template-columns: 1fr 1fr; gap: 8px; background: #f9fafb; padding: 10px; border-radius: 6px; border: 1px solid #f3f4f6; }
+            .item-row .madhat-input { margin-bottom: 5px; }
+            /* Force name input to full width on mobile */
+            .item-row div:nth-child(4) { grid-column: 1 / -1; } /* Nimetus */
+            .item-row button { grid-column: 1 / -1; margin-top: 5px; } /* Delete btn */
+            .madhat-wrapper { padding: 20px 15px; }
+        }
     </style>
 
     <div class="madhat-wrapper">
         <?php if (isset($_GET['madhat_sent']) && $_GET['madhat_sent'] == '1'): ?>
             <div class="madhat-alert">
                 <strong>Päring edukalt saadetud!</strong><br>
-                Vaatame andmed üle ja võtame teiega varsti ühendust.
+                Oleme kätte saanud ja võtame peagi ühendust.
             </div>
         <?php endif; ?>
 
@@ -114,73 +253,83 @@ function madhat_render_form() {
 
             <div class="madhat-header"><h3>Hinnapäring & Lõikus</h3></div>
 
-            <div class="madhat-row">
-                <div class="madhat-col"><label class="madhat-label">Nimi</label><input type="text" class="madhat-input" name="client_name" required></div>
-                <div class="madhat-col"><label class="madhat-label">E-post</label><input type="email" class="madhat-input" name="client_email" required></div>
+            <div class="madhat-grid-2">
+                <div><label class="madhat-label">Nimi</label><input type="text" class="madhat-input" name="client_name" required placeholder="Sinu nimi"></div>
+                <div><label class="madhat-label">E-post</label><input type="email" class="madhat-input" name="client_email" required placeholder="näide@email.ee"></div>
             </div>
-            <div class="madhat-row">
-                <div class="madhat-col"><label class="madhat-label">Telefon</label><input type="tel" class="madhat-input" name="client_phone" required></div>
-                <div class="madhat-col"><label class="madhat-label">Asukoht</label><input type="text" class="madhat-input" name="client_location"></div>
+            <div class="madhat-grid-2">
+                <div><label class="madhat-label">Telefon</label><input type="tel" class="madhat-input" name="client_phone" required placeholder="+372 5xxx xxxx"></div>
+                <div><label class="madhat-label">Objekti asukoht</label><input type="text" class="madhat-input" name="client_location" placeholder="Tallinn, Pärnu mnt..."></div>
             </div>
 
-            <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+            <hr class="madhat-divider">
 
-            <label class="madhat-label">Vali materjali tüüp:</label>
-            <div class="radio-group">
-                <label class="radio-label"><input type="radio" name="material_type" value="aknakile" required onchange="toggleSubType()"> Aknakiled</label>
-                <label class="radio-label"><input type="radio" name="material_type" value="sisustuskile" required onchange="toggleSubType()"> Sisustuskiled</label>
+            <div class="madhat-mb">
+                <label class="madhat-label">Vali materjali tüüp:</label>
+                <div class="radio-group">
+                    <label class="radio-label"><input type="radio" name="material_type" value="aknakile" required onchange="toggleSubType()"> Aknakiled</label>
+                    <label class="radio-label"><input type="radio" name="material_type" value="sisustuskile" required onchange="toggleSubType()"> Sisustuskiled</label>
+                </div>
             </div>
 
             <div id="sub-type-container" class="sub-type-wrap">
                 <label class="madhat-label">Täpsusta kile tüüp:</label>
-                <select name="material_sub_type" class="madhat-select" id="sub_type_select">
-                </select>
+                <select name="material_sub_type" class="madhat-select" id="sub_type_select"></select>
             </div>
 
-            <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:5px;">
-                <label class="madhat-label">Mõõdud (mm)</label>
-                <small style="color:#666; font-size:0.75em;">Ümardame automaatselt cm täpsuseni</small>
-            </div>
-            
-            <div id="madhat-rows">
-                <div class="madhat-row item-row">
-                    <div class="madhat-col"><input type="number" class="madhat-input input-w" name="items[0][w]" placeholder="Laius" required onchange="calcPrice(this)"></div>
-                    <div class="madhat-col"><input type="number" class="madhat-input input-h" name="items[0][h]" placeholder="Kõrgus" required onchange="calcPrice(this)"></div>
-                    <div class="madhat-col" style="flex:0.6"><input type="number" class="madhat-input input-q" name="items[0][q]" value="1" required onchange="calcPrice()"></div>
-                    <div class="madhat-col"><input type="text" class="madhat-input" name="items[0][l]" placeholder="Nimetus"></div>
+            <div class="madhat-mb" style="margin-top:25px;">
+                <label class="madhat-label" style="display:flex; justify-content:space-between;">
+                    Mõõdud (mm)
+                    <span style="font-weight:400; font-size:0.8em; color:#9ca3af;">Ümardamine: 1cm täpsuseni</span>
+                </label>
+                
+                <div class="measurements-header">
+                    <label>Laius</label>
+                    <label>Kõrgus</label>
+                    <label>Kogus</label>
+                    <label>Nimetus/Info</label>
+                    <label></label>
                 </div>
+
+                <div id="madhat-rows">
+                    <div class="item-row">
+                        <div><input type="number" class="madhat-input input-w" name="items[0][w]" placeholder="L (mm)" required onchange="calcPrice(this)"></div>
+                        <div><input type="number" class="madhat-input input-h" name="items[0][h]" placeholder="H (mm)" required onchange="calcPrice(this)"></div>
+                        <div><input type="number" class="madhat-input input-q" name="items[0][q]" value="1" required onchange="calcPrice()"></div>
+                        <div><input type="text" class="madhat-input" name="items[0][l]" placeholder="Nt. Köögiaken"></div>
+                        <div></div>
+                    </div>
+                </div>
+                <button type="button" class="madhat-btn btn-add" onclick="addMRow()">+ Lisa uus rida</button>
             </div>
-            <button type="button" class="madhat-btn btn-add" onclick="addMRow()">+ Lisa rida</button>
 
             <div class="madhat-summary" id="price-box" style="display:none;">
-                <span>Hinnanguline maksumus:</span>
+                <span>Hinnanguline materjali maksumus:</span>
                 <span class="price-range" id="price-display">0€ - 0€</span>
-                <span class="price-note">+ käibemaks (materjal + töö)</span>
+                <span class="price-note">+ KÄIBEMAKS (SISALDAB MATERJALI JA TÖÖD)</span>
             </div>
 
-            <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+            <hr class="madhat-divider">
 
-            <div class="madhat-row">
-                <div class="madhat-col">
-                    <label class="madhat-label">Lisainfo</label>
-                    <textarea name="client_info" class="madhat-textarea" rows="2"></textarea>
-                </div>
+            <div class="madhat-mb">
+                <label class="madhat-label">Lisainfo</label>
+                <textarea name="client_info" class="madhat-textarea" rows="3" placeholder="Täpsustavad soovid..."></textarea>
             </div>
-            <div class="madhat-row">
-                <div class="madhat-col">
-                    <label class="madhat-label">Failid/Pildid</label>
-                    <input type="file" name="client_files[]" multiple style="font-size:0.85em;">
-                </div>
+            
+            <div class="madhat-mb">
+                <label class="madhat-label">Failid / Pildid / Joonised</label>
+                <input type="file" name="client_files[]" multiple style="font-size:0.9em; padding:10px 0;">
             </div>
 
-            <div style="margin-top:20px;">
-                <button type="submit" class="madhat-btn" style="width:100%; padding:12px;">Saada päring</button>
-                <p style="text-align:center; font-size:0.8em; color:#888; margin-top:10px;">Võtame ühendust esimesel võimalusel!</p>
+            <div style="margin-top:30px;">
+                <button type="submit" class="madhat-btn btn-submit">SAADA PÄRING</button>
+                <p style="text-align:center; font-size:0.85rem; color:#6b7280; margin-top:12px;">Vastame päringule esimesel võimalusel.</p>
             </div>
         </form>
     </div>
 
     <script>
+    // --- SEADISTUSED ---
     const PRICE_MIN = 45; 
     const PRICE_MAX = 65;
     
@@ -251,13 +400,13 @@ function madhat_render_form() {
     let rIdx = 1;
     function addMRow() {
         const div = document.createElement('div');
-        div.className = 'madhat-row item-row';
+        div.className = 'item-row';
         div.innerHTML = `
-            <div class="madhat-col"><input type="number" class="madhat-input input-w" name="items[${rIdx}][w]" placeholder="Laius" required onchange="calcPrice(this)"></div>
-            <div class="madhat-col"><input type="number" class="madhat-input input-h" name="items[${rIdx}][h]" placeholder="Kõrgus" required onchange="calcPrice(this)"></div>
-            <div class="madhat-col" style="flex:0.6"><input type="number" class="madhat-input input-q" name="items[${rIdx}][q]" value="1" required onchange="calcPrice()"></div>
-            <div class="madhat-col"><input type="text" class="madhat-input" name="items[${rIdx}][l]" placeholder="Nimetus"></div>
-            <button type="button" class="madhat-btn btn-remove" onclick="this.parentElement.remove(); calcPrice();">X</button>
+            <div><input type="number" class="madhat-input input-w" name="items[${rIdx}][w]" placeholder="L" required onchange="calcPrice(this)"></div>
+            <div><input type="number" class="madhat-input input-h" name="items[${rIdx}][h]" placeholder="H" required onchange="calcPrice(this)"></div>
+            <div><input type="number" class="madhat-input input-q" name="items[${rIdx}][q]" value="1" required onchange="calcPrice()"></div>
+            <div><input type="text" class="madhat-input" name="items[${rIdx}][l]" placeholder="Nimetus"></div>
+            <div><button type="button" class="madhat-btn btn-remove" onclick="this.parentElement.parentElement.remove(); calcPrice();">×</button></div>
         `;
         document.getElementById('madhat-rows').appendChild(div);
         rIdx++;
@@ -269,7 +418,7 @@ function madhat_render_form() {
 add_shortcode('madhat_form', 'madhat_render_form');
 
 // ---------------------------------------------------------
-// 2. TÖÖTLEMINE
+// 3. TÖÖTLEMINE JA SAATMINE
 // ---------------------------------------------------------
 function madhat_handle_submit() {
     if (!isset($_POST['madhat_nonce']) || !wp_verify_nonce($_POST['madhat_nonce'], 'madhat_verify')) wp_die('Turvaviga.');
@@ -285,7 +434,6 @@ function madhat_handle_submit() {
     $sub_type = sanitize_text_field($_POST['material_sub_type']);
     
     $items = isset($_POST['items']) ? $_POST['items'] : [];
-
     $offset = ($type === 'sisustuskile') ? 80 : 20;
     
     $csv = "\xEF\xBB\xBFLength,Width,Qty,Label,Enabled\n";
@@ -345,10 +493,13 @@ function madhat_handle_submit() {
         }
     }
 
-    $to = 'arendus@veebmik.ee'; 
+    // --- E-MAILI LOOGIKA ---
+    // Võta seadetest email. Kui seda pole, võta admini oma.
+    $recipient = get_option('madhat_recipient_email', get_option('admin_email'));
+    
     $headers = ['Content-Type: text/plain; charset=UTF-8', 'From: Madhat Kalkulaator <wordpress@' . $_SERVER['SERVER_NAME'] . '>'];
     
-    wp_mail($to, "Päring: $name ($type)", $mail_txt, $headers, $attachments);
+    wp_mail($recipient, "Päring: $name ($type)", $mail_txt, $headers, $attachments);
 
     wp_redirect(add_query_arg('madhat_sent', '1', wp_get_referer()));
     exit;

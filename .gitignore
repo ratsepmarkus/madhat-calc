@@ -1,0 +1,10 @@
+# Ignoreeri operatsioonisüsteemi failid
+.DS_Store
+Thumbs.db
+
+# Ignoreeri IDE seaded (kui kasutad VSCode vms)
+.vscode/
+.idea/
+
+# Ära ignoreeri plugin-update-checker kausta!
+!plugin-update-checker/

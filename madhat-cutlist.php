@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Madhat Cutlist Calculator (Pro)
  * Description: Kalkulaator hinnavahimiku, materjali valiku ja CSV ekspordiga.
- * Version: 1.3
+ * Version: 1.4
  * Author: Madhat
  * Update URI: https://github.com/ratsepmarkus/madhat-calc
  */

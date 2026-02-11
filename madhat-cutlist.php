@@ -4,7 +4,7 @@
  * Description: Kalkulaator hinnavahimiku, materjali valiku ja CSV ekspordiga.
  * Version: 1.3
  * Author: Madhat
- * Update URI: https://github.com/ratsepmarkus/madhat-calculator
+ * Update URI: https://github.com/ratsepmarkus/madhat-calc
  */
 
 if (!defined('ABSPATH')) {
@@ -14,25 +14,33 @@ if (!defined('ABSPATH')) {
 // ---------------------------------------------------------
 // 0. AUTOMATIC UPDATER (GitHub)
 // ---------------------------------------------------------
-// Veendu, et kaust 'plugin-update-checker' on plugina kaustas olemas!
-if (file_exists(__DIR__ . '/plugin-update-checker/plugin-update-checker.php')) {
-    require 'plugin-update-checker/plugin-update-checker.php';
-    
-    // Kasutame v5 nimeruumi (toimib 5.0 - 5.x versioonidega)
-    use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
+// Kontrollime, kas uuendaja fail on olemas
+$puc_path = plugin_dir_path(__FILE__) . 'plugin-update-checker/plugin-update-checker.php';
 
-    $myUpdateChecker = PucFactory::buildUpdateChecker(
-        'https://github.com/ratsepmarkus/madhat-calculator', // Sinu Repo URL
-        __FILE__, // See fail
-        'madhat-cutlist-calculator-pro' // Unikaalne slug
+if (file_exists($puc_path)) {
+    require_once $puc_path;
+    
+    // PARANDUS: Eemaldasime "use" ja panime siia pika nime (Fully Qualified Name)
+    // Samuti uuendasime repo lingi "madhat-calc" peale
+    $myUpdateChecker = \YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
+        'https://github.com/ratsepmarkus/madhat-calc',
+        __FILE__,
+        'madhat-cutlist-calculator-pro'
     );
 
-    // Valikuline: Määra haru (branch), kui ei kasuta masterit/maini
+    // Määra haru (branch)
     $myUpdateChecker->setBranch('main');
 
-    // See rida võimaldab tõmmata GitHubi Release alt .zip faili
-    // (See on stabiilsem kui otse koodi tõmbamine)
+    // Tõmba zip release alt
     $myUpdateChecker->getVcsApi()->enableReleaseAssets();
+
+} else {
+    // KUI FAIL PUUDUB: Hoiatus adminile
+    add_action('admin_notices', function() {
+        if (current_user_can('activate_plugins')) {
+            echo '<div class="notice notice-error"><p><strong>Viga:</strong> Madhat Calculator ei leia kausta "plugin-update-checker". Automaatsed uuendused ei tööta, aga kalkulaator ise toimib.</p></div>';
+        }
+    });
 }
 
 // ---------------------------------------------------------
@@ -173,7 +181,6 @@ function madhat_render_form() {
     </div>
 
     <script>
-    // --- SEADISTUSED ---
     const PRICE_MIN = 45; 
     const PRICE_MAX = 65;
     

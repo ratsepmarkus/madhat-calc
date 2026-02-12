@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Madhat Cutlist Calculator
  * Description: Kalkulaator hinnavahemiku, materjali valiku ja CSV ekspordiga. Seadistatav admin paneelist.
- * Version: 1.6
+ * Version: 1.7
  * Author: Veebmik
  * Author URI: https://veebmik.ee
  * Update URI: https://github.com/ratsepmarkus/madhat-calc
@@ -38,11 +38,10 @@ if (file_exists($puc_path)) {
 // 1. ADMIN PANEELI SEADED
 // ---------------------------------------------------------
 
-// Registreeri seaded (Email + Hinnad)
 function madhat_register_settings() {
     register_setting('madhat_options_group', 'madhat_recipient_email');
-    register_setting('madhat_options_group', 'madhat_price_min'); // UUS
-    register_setting('madhat_options_group', 'madhat_price_max'); // UUS
+    register_setting('madhat_options_group', 'madhat_price_min');
+    register_setting('madhat_options_group', 'madhat_price_max');
 }
 add_action('admin_init', 'madhat_register_settings');
 
@@ -69,10 +68,10 @@ function madhat_settings_page_html() {
             
             <table class="form-table">
                 <tr valign="top">
-                    <th scope="row">E-mail päringuteks:</th>
+                    <th scope="row">E-mail(id) päringuteks:</th>
                     <td>
-                        <input type="email" name="madhat_recipient_email" value="<?php echo esc_attr(get_option('madhat_recipient_email')); ?>" class="regular-text" placeholder="nt. info@sinufirma.ee" />
-                        <p class="description">Sinna saadetakse kliendi päringud ja CSV fail.</p>
+                        <input type="text" name="madhat_recipient_email" value="<?php echo esc_attr(get_option('madhat_recipient_email')); ?>" class="large-text" placeholder="info@sinufirma.ee, myyk@sinufirma.ee" />
+                        <p class="description">Sinna saadetakse kliendi päringud ja CSV fail. Mitme saaja korral eralda aadressid komaga (nt: <code>info@a.ee, mari@a.ee</code>).</p>
                     </td>
                 </tr>
                 
@@ -101,7 +100,6 @@ function madhat_settings_page_html() {
 // 2. VORMI KUVAMINE
 // ---------------------------------------------------------
 function madhat_render_form() {
-    // Küsime andmebaasist hinnad (vaikimisi 45 ja 65)
     $price_min = get_option('madhat_price_min', 45);
     $price_max = get_option('madhat_price_max', 65);
 
@@ -514,6 +512,8 @@ function madhat_handle_submit() {
     }
 
     // --- E-MAILI LOOGIKA ---
+    // Saame kirjutada: info@mail.ee, teine@mail.ee
+    // WordPressi wp_mail() saab ise komadega eraldatud listist aru.
     $recipient = get_option('madhat_recipient_email', get_option('admin_email'));
     
     $headers = ['Content-Type: text/plain; charset=UTF-8', 'From: Madhat Kalkulaator <wordpress@' . $_SERVER['SERVER_NAME'] . '>'];

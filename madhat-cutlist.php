@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Madhat Cutlist Calculator
  * Description: Kalkulaator hinnavahemiku, materjali valiku ja CSV ekspordiga. Seadistatav admin paneelist.
- * Version: 1.9
+ * Version: 1.10
  * Author: Veebmik
  * Author URI: https://veebmik.ee
  * Update URI: https://github.com/ratsepmarkus/madhat-calc
@@ -42,6 +42,10 @@ function madhat_register_settings() {
     register_setting('madhat_options_group', 'madhat_recipient_email');
     register_setting('madhat_options_group', 'madhat_price_min');
     register_setting('madhat_options_group', 'madhat_price_max');
+    
+    // UUED SEADED: Rippmenüüde sisu
+    register_setting('madhat_options_group', 'madhat_opts_window');
+    register_setting('madhat_options_group', 'madhat_opts_interior');
 }
 add_action('admin_init', 'madhat_register_settings');
 
@@ -51,29 +55,50 @@ function madhat_add_admin_menu() {
 add_action('admin_menu', 'madhat_add_admin_menu');
 
 function madhat_settings_page_html() {
+    // Vaikimisi väärtused placeholderi jaoks
+    $def_win = "3M Prestige nanokile\nDekoratiiv/Mattkile\nTurvakile\nMuu";
+    $def_int = "Puitimitatsioon\nKiviimitatsioon\nVärviline matt\nNahkimitatsioon\nMuu";
     ?>
     <div class="wrap">
         <h1>Madhat Kalkulaatori Seaded</h1>
         <form method="post" action="options.php">
             <?php settings_fields('madhat_options_group'); ?>
             <?php do_settings_sections('madhat_options_group'); ?>
-            <table class="form-table">
-                <tr valign="top">
-                    <th scope="row">E-mail(id) päringuteks:</th>
-                    <td>
-                        <input type="text" name="madhat_recipient_email" value="<?php echo esc_attr(get_option('madhat_recipient_email')); ?>" class="large-text" placeholder="info@sinufirma.ee" />
-                        <p class="description">Eralda mitu aadressi komaga.</p>
-                    </td>
-                </tr>
-                <tr valign="top">
-                    <th scope="row">Ruutmeetri hind (€/m²):</th>
-                    <td>
-                        <label>Min: <input type="number" name="madhat_price_min" value="<?php echo esc_attr(get_option('madhat_price_min', 45)); ?>" class="small-text" step="0.1" /> €</label>
-                        &nbsp;&mdash;&nbsp;
-                        <label>Max: <input type="number" name="madhat_price_max" value="<?php echo esc_attr(get_option('madhat_price_max', 65)); ?>" class="small-text" step="0.1" /> €</label>
-                    </td>
-                </tr>
-            </table>
+            
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+                <div>
+                    <h3>Üldseaded</h3>
+                    <table class="form-table">
+                        <tr valign="top">
+                            <th scope="row">E-mail(id):</th>
+                            <td>
+                                <input type="text" name="madhat_recipient_email" value="<?php echo esc_attr(get_option('madhat_recipient_email')); ?>" class="large-text" placeholder="info@sinufirma.ee" />
+                                <p class="description">Eralda komaga. Sinna saadetakse päringud.</p>
+                            </td>
+                        </tr>
+                        <tr valign="top">
+                            <th scope="row">Hind (€/m²):</th>
+                            <td>
+                                <label>Min: <input type="number" name="madhat_price_min" value="<?php echo esc_attr(get_option('madhat_price_min', 45)); ?>" class="small-text" step="0.1" /> €</label><br>
+                                <label>Max: <input type="number" name="madhat_price_max" value="<?php echo esc_attr(get_option('madhat_price_max', 65)); ?>" class="small-text" step="0.1" /> €</label>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div>
+                    <h3>Materjalide valikud</h3>
+                    <p class="description">Kirjuta iga valik <strong>uuele reale</strong>.</p>
+                    
+                    <label><strong>Aknakiled:</strong></label><br>
+                    <textarea name="madhat_opts_window" rows="5" class="large-text code"><?php echo esc_textarea(get_option('madhat_opts_window', $def_win)); ?></textarea>
+                    <br><br>
+                    
+                    <label><strong>Sisustuskiled:</strong></label><br>
+                    <textarea name="madhat_opts_interior" rows="5" class="large-text code"><?php echo esc_textarea(get_option('madhat_opts_interior', $def_int)); ?></textarea>
+                </div>
+            </div>
+            
             <?php submit_button(); ?>
         </form>
     </div>
@@ -86,6 +111,27 @@ function madhat_settings_page_html() {
 function madhat_render_form() {
     $price_min = get_option('madhat_price_min', 45);
     $price_max = get_option('madhat_price_max', 65);
+
+    // Valmistame andmed ette JS jaoks (Teeme tekstist massiivi)
+    $raw_win = get_option('madhat_opts_window');
+    $raw_int = get_option('madhat_opts_interior');
+
+    // Kui adminis on tühi, kasutame vaikimisi väärtusi
+    if (empty(trim($raw_win))) {
+        $arr_win = ['3M Prestige nanokile', 'Dekoratiiv/Mattkile', 'Turvakile', 'Muu'];
+    } else {
+        $arr_win = array_filter(array_map('trim', explode("\n", $raw_win))); // Teeme arrayks ja eemaldame tühikud
+    }
+
+    if (empty(trim($raw_int))) {
+        $arr_int = ['Puitimitatsioon', 'Kiviimitatsioon', 'Värviline matt', 'Nahkimitatsioon', 'Muu'];
+    } else {
+        $arr_int = array_filter(array_map('trim', explode("\n", $raw_int)));
+    }
+
+    // Kodeerime JSON-iks, et JS saaks lugeda
+    $json_win = json_encode(array_values($arr_win));
+    $json_int = json_encode(array_values($arr_int));
 
     ob_start();
     ?>
@@ -127,16 +173,16 @@ function madhat_render_form() {
         .item-row {
             display: grid;
             grid-template-columns: 2fr 2fr 1.2fr 3fr 40px;
-            gap: 10px; margin-bottom: 10px; align-items: flex-end; /* Align bottom fixes delete button on PC */
+            gap: 10px; margin-bottom: 10px; align-items: flex-end; 
         }
 
         /* Buttons */
         .madhat-btn { padding: 10px 20px; border: none; cursor: pointer; border-radius: 6px; font-size: 15px; font-weight: 600; transition: all 0.2s; }
         .btn-submit { 
             background-color: #111827; color: #fff; 
-            padding: 14px 40px; /* Normal size */
+            padding: 14px 40px; 
             margin-top: 10px; 
-            display: block; margin-left: auto; margin-right: auto; /* Center */
+            display: block; margin-left: auto; margin-right: auto;
         }
         .btn-submit:hover { background-color: #000; }
         .btn-add { background-color: #e5e7eb; color: #374151; width: 100%; border: 1px solid #d1d5db; }
@@ -149,7 +195,19 @@ function madhat_render_form() {
         .price-range { font-size: 1.8rem; font-weight: 700; display: block; margin: 5px 0; color: #047857; }
         .price-note { font-size: 0.85rem; color: #059669; text-transform: uppercase; letter-spacing: 0.5px; }
         
-        .confirm-box { margin-top: 20px; display: flex; align-items: center; justify-content:center; gap: 10px; background: #fffbeb; padding: 10px; border-radius: 6px; border: 1px solid #fcd34d; font-size: 0.95rem; }
+        /* Confirm box: Centered and auto width */
+        .confirm-wrap { text-align: center; margin-top: 20px; }
+        .confirm-box { 
+            display: inline-flex; /* Oluline: võtab laiust sisu järgi */
+            align-items: center; 
+            justify-content: center; 
+            gap: 10px; 
+            background: #fffbeb; 
+            padding: 10px 20px; 
+            border-radius: 6px; 
+            border: 1px solid #fcd34d; 
+            font-size: 0.95rem; 
+        }
         .confirm-box input { transform: scale(1.3); cursor: pointer; }
 
         .sub-type-wrap { display: none; margin-bottom: 15px; animation: fadeIn 0.3s; }
@@ -166,16 +224,16 @@ function madhat_render_form() {
             .item-row { 
                 grid-template-columns: 1.5fr 1.5fr 1fr 2.5fr 30px; 
                 gap: 5px; 
-                align-items: flex-end; /* Joondab nupu ja väljad alla */
+                align-items: flex-end; 
             }
             .madhat-wrapper { padding: 20px 10px; }
             
             .mobile-label { display: block; font-size: 0.7rem; color: #888; margin-bottom: 2px; }
             
-            /* Compact padding for mobile inputs so numbers fit */
-            .madhat-input { padding: 8px 4px; font-size: 13px; }
+            /* Tighter padding for mobile inputs */
+            .madhat-input { padding: 8px 4px !important; font-size: 13px; }
             
-            .btn-remove { height: 35px; } /* Adjust height to match smaller inputs */
+            .btn-remove { height: 35px; }
         }
         @media (min-width: 601px) {
             .mobile-label { display: none; }
@@ -225,7 +283,6 @@ function madhat_render_form() {
             <div class="madhat-mb" style="margin-top:25px;">
                 <label class="madhat-label" style="display:flex; justify-content:space-between;">
                     Mõõdud (mm)
-                    <span style="font-weight:400; font-size:0.8em; color:#9ca3af;">Arvutame 10mm täpsusega (ümardame üles)</span>
                 </label>
                 
                 <div class="measurements-header">
@@ -258,9 +315,11 @@ function madhat_render_form() {
                 <input type="file" name="client_files[]" multiple style="font-size:0.9em; padding:10px 0;">
             </div>
 
-            <div class="confirm-box">
-                <input type="checkbox" name="confirm_measurements" required>
-                <label>Kinnitan mõõtude täpsuse +/- 1cm</label>
+            <div class="confirm-wrap">
+                <div class="confirm-box">
+                    <input type="checkbox" name="confirm_measurements" required>
+                    <label>Kinnitan mõõtude täpsuse +/- 1cm</label>
+                </div>
             </div>
 
             <div style="margin-top:20px;">
@@ -273,10 +332,10 @@ function madhat_render_form() {
     const PRICE_MIN = <?php echo esc_js($price_min); ?>; 
     const PRICE_MAX = <?php echo esc_js($price_max); ?>;
     
-    // Uuendatud nimed vastavalt soovile
+    // Dünaamilised valikud PHP-st
     const SUB_TYPES = {
-        'aknakile': ['3M Prestige nanokile', 'Dekoratiiv/Mattkile', 'Turvakile', 'Muu'],
-        'sisustuskile': ['Puitimitatsioon', 'Kiviimitatsioon', 'Värviline matt', 'Nahkimitatsioon', 'Muu']
+        'aknakile': <?php echo $json_win; ?>,
+        'sisustuskile': <?php echo $json_int; ?>
     };
 
     function saveState() {
@@ -369,7 +428,6 @@ function madhat_render_form() {
     function getRoundedUpVal(val) {
         if(!val) return 0;
         let v = parseInt(val);
-        // Ümardame ÜLES järgmise 10-ni (nt 451 -> 460, 450 -> 450)
         return Math.ceil(v / 10) * 10;
     }
 
@@ -382,7 +440,6 @@ function madhat_render_form() {
             const hRaw = row.querySelector('.input-h').value;
             const q = row.querySelector('.input-q').value;
 
-            // Arvutame hinna jaoks ümardatud väärtustega, aga ei muuda lahtrit
             const w = getRoundedUpVal(wRaw);
             const h = getRoundedUpVal(hRaw);
 
@@ -468,8 +525,6 @@ function madhat_handle_submit() {
             $w_raw = floatval($i['w']);
             $h_raw = floatval($i['h']);
             
-            // Siin PHP pool teeme ka kindla peale ümardamise üles (ceil), et CSV oleks turvaline
-            // Eeldame, et kui on 451, siis peab olema 460
             $w = ceil($w_raw / 10) * 10;
             $h = ceil($h_raw / 10) * 10;
             

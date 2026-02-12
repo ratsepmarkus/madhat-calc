@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Madhat Cutlist Calculator
  * Description: Kalkulaator hinnavahemiku, materjali valiku ja CSV ekspordiga. Seadistatav admin paneelist.
- * Version: 1.12
+ * Version: 1.13
  * Author: Veebmik
  * Author URI: https://veebmik.ee
  * Update URI: https://github.com/ratsepmarkus/madhat-calc
@@ -111,7 +111,7 @@ function madhat_render_form() {
     ?>
     <style>
         .madhat-wrapper { 
-            max_width: 700px; margin: 40px auto; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            max_width: 800px; margin: 40px auto; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             padding: 30px; background: #ffffff; border-radius: 12px; 
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); color: #374151;
         }
@@ -120,7 +120,8 @@ function madhat_render_form() {
 
         .madhat-label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.9rem; color: #4b5563; }
         .madhat-input, .madhat-select, .madhat-textarea { 
-            width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 15px; background-color: #f9fafb;
+            width: 100%; padding: 8px 10px; /* VÄIKSEM PADDING DESKTOPIL */
+            border: 1px solid #d1d5db; border-radius: 6px; font-size: 15px; background-color: #f9fafb;
         }
         .madhat-input:focus, .madhat-select:focus { outline: none; border-color: #2563eb; background-color: #fff; }
 
@@ -128,36 +129,44 @@ function madhat_render_form() {
         .madhat-mb { margin-bottom: 15px; }
         .madhat-divider { height: 1px; background: #e5e7eb; margin: 25px 0; border: none; }
 
-        /* ITEM CARD STYLE V2.1 */
+        /* ITEM CARD STYLE V2.2 */
         .item-row {
             background: #f8fafc;
             border: 1px solid #e2e8f0;
             border-radius: 8px;
-            padding: 15px;
-            padding-top: 25px; /* Ruumi numbri jaoks */
-            margin-bottom: 15px;
+            padding: 10px 15px;
+            padding-top: 25px; 
+            margin-bottom: 10px;
             position: relative;
         }
         
         .row-number {
             position: absolute;
-            top: 6px;
+            top: 5px;
             left: 10px;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             font-weight: 700;
             color: #94a3b8;
             text-transform: uppercase;
         }
 
-        /* PC Layout */
-        .item-grid {
+        /* --- DESKTOP LAYOUT (> 1200px) --- */
+        .measurements-header {
             display: grid;
             /* Mat, Name, W, H, Q, Del */
-            grid-template-columns: 2fr 1.5fr 1fr 1fr 0.7fr 40px; 
+            grid-template-columns: 2fr 1.5fr 1fr 1fr 0.6fr 40px; 
+            gap: 10px; margin-bottom: 5px;
+        }
+        .measurements-header label { font-size: 0.8rem; color: #6b7280; font-weight: 600; }
+
+        .item-grid {
+            display: grid;
+            grid-template-columns: 2fr 1.5fr 1fr 1fr 0.6fr 40px; 
             gap: 10px;
             align-items: center;
         }
 
+        /* Buttons */
         .madhat-btn { padding: 10px 20px; border: none; cursor: pointer; border-radius: 6px; font-size: 15px; font-weight: 600; transition: all 0.2s; }
         .btn-submit { 
             background-color: #111827; color: #fff; padding: 14px 40px; margin-top: 10px; 
@@ -167,11 +176,13 @@ function madhat_render_form() {
         .btn-add { background-color: #e5e7eb; color: #374151; width: 100%; border: 1px solid #d1d5db; padding: 12px; }
         .btn-add:hover { background-color: #d1d5db; }
         
+        /* TRASH ICON BUTTON */
         .btn-remove { 
-            background-color: #fee2e2; color: #ef4444; height: 42px; width: 100%; 
+            background-color: #fee2e2; color: #ef4444; height: 38px; width: 100%; 
             display: flex; align-items: center; justify-content: center; border: 1px solid #fecaca; padding: 0;
             border-radius: 6px;
         }
+        .btn-remove svg { width: 18px; height: 18px; fill: currentColor; }
         .btn-remove:hover { background-color: #fecaca; }
 
         .madhat-summary { background: #ecfdf5; border: 1px solid #d1fae5; border-radius: 8px; padding: 20px; margin-top: 25px; text-align: center; color: #065f46; }
@@ -183,21 +194,25 @@ function madhat_render_form() {
 
         .madhat-alert { padding: 15px; margin-bottom: 20px; background: #d1fae5; color: #065f46; border-radius: 8px; text-align: center; border: 1px solid #a7f3d0; }
         .madhat-honey { display: none !important; }
+        
+        /* Mobile Labels (Hidden on Desktop) */
+        .mobile-label { display: none; font-size: 0.75rem; color: #64748b; font-weight: 600; margin-bottom: 3px; }
 
-        /* Mobile Layout V2.1 - Compact 2 Rows */
-        @media (max-width: 600px) {
+        /* --- TABLET & MOBILE LAYOUT (< 1200px) --- */
+        @media (max-width: 1200px) {
             .madhat-grid-2 { grid-template-columns: 1fr; }
-            .price-range { font-size: 1.4rem; }
+            .measurements-header { display: none; } /* Hide table header */
+            .mobile-label { display: block; } /* Show labels above inputs */
             
-            .item-row { padding: 10px; padding-top: 25px; } /* Less padding */
+            .item-row { padding-top: 30px; }
             
             .item-grid {
-                /* Row 2 cols: Width, Height, Qty, Del */
-                grid-template-columns: 1fr 1fr 0.8fr 35px;
+                /* Row 2 layout: Width | Height | Qty | Delete */
+                grid-template-columns: 1fr 1fr 0.8fr 40px;
                 grid-template-areas: 
-                    "mat mat name name" /* Row 1: Mat & Name share width */
-                    "width height qty del"; /* Row 2: Inputs & button */
-                gap: 6px; /* Tight gap */
+                    "mat mat name name" 
+                    "width height qty del"; 
+                gap: 10px; 
             }
             
             .grid-mat { grid-area: mat; }
@@ -207,18 +222,10 @@ function madhat_render_form() {
             .grid-q { grid-area: qty; }
             .grid-d { grid-area: del; }
             
-            .madhat-wrapper { padding: 20px 10px; }
+            .madhat-wrapper { padding: 20px 15px; }
             
-            /* Hide labels in grid, rely on placeholder */
-            .mobile-label { display: none; } 
-            
-            /* Super compact inputs for mobile */
-            .madhat-input, .madhat-select { 
-                padding: 8px 4px !important; 
-                font-size: 13px; 
-                height: 38px;
-            }
-            .btn-remove { height: 38px; } 
+            /* Align delete button to bottom of inputs */
+            .btn-remove { margin-top: 17px; height: 38px; }
         }
     </style>
 
@@ -251,6 +258,16 @@ function madhat_render_form() {
 
             <div class="madhat-mb" style="margin-top:25px;">
                 <label class="madhat-label">Materjalid ja Mõõdud (mm)</label>
+                
+                <div class="measurements-header">
+                    <label>Materjal</label>
+                    <label>Pinna nimetus</label>
+                    <label>Laius</label>
+                    <label>Kõrgus</label>
+                    <label>Kogus</label>
+                    <label></label>
+                </div>
+
                 <div id="madhat-rows"></div>
                 <button type="button" class="madhat-btn btn-add" onclick="addMRow(true)">+ Lisa uus rida</button>
             </div>
@@ -294,8 +311,6 @@ function madhat_render_form() {
 
     function buildOptions(selected = '') {
         let html = '<option value="" disabled selected>-- Vali materjal --</option>';
-        
-        // NB! Eemaldasime siit (+20mm) tekstid, et oleks puhtam
         html += '<optgroup label="Aknakiled">';
         WIN_OPTS.forEach(opt => {
             const val = 'win|' + opt;
@@ -303,7 +318,6 @@ function madhat_render_form() {
             html += `<option value="${val}" ${isSel}>${opt}</option>`;
         });
         html += '</optgroup>';
-
         html += '<optgroup label="Sisustuskiled">';
         INT_OPTS.forEach(opt => {
             const val = 'int|' + opt;
@@ -311,7 +325,6 @@ function madhat_render_form() {
             html += `<option value="${val}" ${isSel}>${opt}</option>`;
         });
         html += '</optgroup>';
-        
         return html;
     }
 
@@ -394,8 +407,7 @@ function madhat_render_form() {
     }
 
     function updateRowNumbers() {
-        const rows = document.querySelectorAll('.item-row');
-        rows.forEach((row, index) => {
+        document.querySelectorAll('.item-row').forEach((row, index) => {
             const numEl = row.querySelector('.row-number');
             if(numEl) numEl.textContent = 'Nr. ' + (index + 1);
         });
@@ -414,25 +426,43 @@ function madhat_render_form() {
         
         const optionsHtml = buildOptions(mat);
 
+        // Trash Icon SVG
+        const trashSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2C12.5523 2 13 2.44772 13 3V4H19C19.5523 4 20 4.44772 20 5C20 5.55228 19.5523 6 19 6H5C4.44772 6 4 5.55228 4 5C4 4.44772 4.44772 4 5 4H11V3C11 2.44772 11.4477 2 12 2ZM6 8V20C6 21.1046 6.89543 22 8 22H16C17.1046 22 18 21.1046 18 20V8H6ZM9 10C9.55228 10 10 10.4477 10 11V19C10 19.5523 9.55228 20 9 20C8.44772 20 8 19.5523 8 19V11C8 10.4477 8.44772 10 9 10ZM15 10C15.5523 10 16 10.4477 16 11V19C16 19.5523 15.5523 20 15 20C14.4477 20 14 19.5523 14 19V11C14 10.4477 14.4477 10 15 10Z"></path></svg>`;
+
         div.innerHTML = `
             <span class="row-number"></span>
             <div class="item-grid">
                 <div class="grid-mat">
+                    <span class="mobile-label">Materjal</span>
                     <select class="madhat-select input-mat" name="items[${rIdx}][mat]" required onchange="saveState()">
                         ${optionsHtml}
                     </select>
                 </div>
-                <div class="grid-n"><input type="text" class="madhat-input input-l" name="items[${rIdx}][l]" value="${l}" placeholder="Nimetus" oninput="saveState()"></div>
+                <div class="grid-n">
+                    <span class="mobile-label">Pinna nimetus</span>
+                    <input type="text" class="madhat-input input-l" name="items[${rIdx}][l]" value="${l}" placeholder="nt. Köögi aken" oninput="saveState()">
+                </div>
                 
-                <div class="grid-w"><input type="number" class="madhat-input input-w" name="items[${rIdx}][w]" value="${w}" placeholder="L (mm)" required onchange="calcPrice(); saveState()"></div>
-                <div class="grid-h"><input type="number" class="madhat-input input-h" name="items[${rIdx}][h]" value="${h}" placeholder="H (mm)" required onchange="calcPrice(); saveState()"></div>
-                <div class="grid-q"><input type="number" class="madhat-input input-q" name="items[${rIdx}][q]" value="${q}" required onchange="calcPrice(); saveState()"></div>
-                <div class="grid-d"><button type="button" class="madhat-btn btn-remove" onclick="this.closest('.item-row').remove(); updateRowNumbers(); calcPrice(); saveState();">×</button></div>
+                <div class="grid-w">
+                    <span class="mobile-label">Laius (mm)</span>
+                    <input type="number" class="madhat-input input-w" name="items[${rIdx}][w]" value="${w}" placeholder="Laius (mm)" required onchange="calcPrice(); saveState()">
+                </div>
+                <div class="grid-h">
+                    <span class="mobile-label">Kõrgus (mm)</span>
+                    <input type="number" class="madhat-input input-h" name="items[${rIdx}][h]" value="${h}" placeholder="Kõrgus (mm)" required onchange="calcPrice(); saveState()">
+                </div>
+                <div class="grid-q">
+                    <span class="mobile-label">Kogus</span>
+                    <input type="number" class="madhat-input input-q" name="items[${rIdx}][q]" value="${q}" required onchange="calcPrice(); saveState()">
+                </div>
+                <div class="grid-d">
+                    <button type="button" class="madhat-btn btn-remove" onclick="this.closest('.item-row').remove(); updateRowNumbers(); calcPrice(); saveState();">${trashSvg}</button>
+                </div>
             </div>
         `;
         document.getElementById('madhat-rows').appendChild(div);
         rIdx++;
-        updateRowNumbers(); // Uuenda numbreid
+        updateRowNumbers();
         if(shouldSave) saveState();
     }
 
@@ -471,7 +501,6 @@ function madhat_handle_submit() {
 
             $w_raw = floatval($i['w']);
             $h_raw = floatval($i['h']);
-            // Safe ümardamine
             $w = ceil($w_raw / 10) * 10;
             $h = ceil($h_raw / 10) * 10;
             $q = intval($i['q']);

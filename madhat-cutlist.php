@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Madhat Cutlist Calculator
  * Description: Kalkulaator hinnavahemiku, materjali valiku ja CSV ekspordiga. Seadistatav admin paneelist.
- * Version: 1.13
+ * Version: 2.0
  * Author: Veebmik
  * Author URI: https://veebmik.ee
  * Update URI: https://github.com/ratsepmarkus/madhat-calc
@@ -120,7 +120,7 @@ function madhat_render_form() {
 
         .madhat-label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.9rem; color: #4b5563; }
         .madhat-input, .madhat-select, .madhat-textarea { 
-            width: 100%; padding: 8px 10px; /* VÄIKSEM PADDING DESKTOPIL */
+            width: 100%; padding: 8px 10px !important; 
             border: 1px solid #d1d5db; border-radius: 6px; font-size: 15px; background-color: #f9fafb;
         }
         .madhat-input:focus, .madhat-select:focus { outline: none; border-color: #2563eb; background-color: #fff; }
@@ -129,7 +129,6 @@ function madhat_render_form() {
         .madhat-mb { margin-bottom: 15px; }
         .madhat-divider { height: 1px; background: #e5e7eb; margin: 25px 0; border: none; }
 
-        /* ITEM CARD STYLE V2.2 */
         .item-row {
             background: #f8fafc;
             border: 1px solid #e2e8f0;
@@ -488,7 +487,7 @@ function madhat_handle_submit() {
     
     $items = isset($_POST['items']) ? $_POST['items'] : [];
     
-    $csv = "\xEF\xBB\xBFLength,Width,Qty,Label,Enabled\n";
+    $csv = "\xEF\xBB\xBFLength,Width,Qty,Material,Label,Enabled\n";
     $mail_txt = "UUS PÄRING VEEBILEHELT\n\nPROJEKT: $project\nKontaktisik: $contact\nEmail: $email\nTelefon: $phone\nLisainfo: $info\n\nMATERJALID JA MÕÕDUD:\n------------------------------------\n";
 
     if (is_array($items)) {
@@ -511,9 +510,11 @@ function madhat_handle_submit() {
             $mail_txt .= "- $mat_name: $w x $h mm ($q tk) - $l\n";
             $csv_w = $w + $offset;
             $csv_h = $h + $offset;
-            $full_label = $l . ' (' . $mat_name . ')';
-            $l_csv = str_replace('"', '""', $full_label); 
-            $csv .= "$csv_h,$csv_w,$q,\"$l_csv\",true\n";
+            
+            $l_csv = str_replace('"', '""', $l); 
+            $mat_csv = str_replace('"', '""', $mat_name);
+            
+            $csv .= "$csv_h,$csv_w,$q,\"$mat_csv\",\"$l_csv\",true\n";
         }
     }
 

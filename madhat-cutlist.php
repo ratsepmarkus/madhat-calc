@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Madhat Cutlist Calculator
  * Description: Kalkulaator hinnavahemiku, materjali valiku ja CSV ekspordiga. Seadistatav admin paneelist.
- * Version: 1.11
+ * Version: 1.12
  * Author: Veebmik
  * Author URI: https://veebmik.ee
  * Update URI: https://github.com/ratsepmarkus/madhat-calc
@@ -13,25 +13,16 @@ if (!defined('ABSPATH')) {
 }
 
 // ---------------------------------------------------------
-// 0. AUTOMATIC UPDATER (GitHub)
+// 0. AUTOMATIC UPDATER
 // ---------------------------------------------------------
 $puc_path = plugin_dir_path(__FILE__) . 'plugin-update-checker/plugin-update-checker.php';
-
 if (file_exists($puc_path)) {
     require_once $puc_path;
     $myUpdateChecker = \YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
-        'https://github.com/ratsepmarkus/madhat-calc',
-        __FILE__,
-        'madhat-calc'
+        'https://github.com/ratsepmarkus/madhat-calc', __FILE__, 'madhat-calc'
     );
     $myUpdateChecker->setBranch('main');
     $myUpdateChecker->getVcsApi()->enableReleaseAssets();
-} else {
-    add_action('admin_notices', function() {
-        if (current_user_can('activate_plugins')) {
-            echo '<div class="notice notice-error"><p><strong>Viga:</strong> Madhat Calculator ei leia kausta "plugin-update-checker".</p></div>';
-        }
-    });
 }
 
 // ---------------------------------------------------------
@@ -61,7 +52,6 @@ function madhat_settings_page_html() {
         <form method="post" action="options.php">
             <?php settings_fields('madhat_options_group'); ?>
             <?php do_settings_sections('madhat_options_group'); ?>
-            
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
                 <div>
                     <h3>Üldseaded</h3>
@@ -69,7 +59,7 @@ function madhat_settings_page_html() {
                         <tr valign="top">
                             <th scope="row">E-mail(id):</th>
                             <td>
-                                <input type="text" name="madhat_recipient_email" value="<?php echo esc_attr(get_option('madhat_recipient_email')); ?>" class="large-text" placeholder="info@sinufirma.ee" />
+                                <input type="text" name="madhat_recipient_email" value="<?php echo esc_attr(get_option('madhat_recipient_email')); ?>" class="large-text" />
                                 <p class="description">Eralda komaga.</p>
                             </td>
                         </tr>
@@ -82,20 +72,16 @@ function madhat_settings_page_html() {
                         </tr>
                     </table>
                 </div>
-
                 <div>
                     <h3>Materjalide valikud</h3>
                     <p class="description">Kirjuta iga valik <strong>uuele reale</strong>.</p>
-                    
-                    <label><strong>Aknakiled (Automaatne lõikuvaru +20mm):</strong></label><br>
+                    <label><strong>Aknakiled (Automaatne offset +20mm):</strong></label><br>
                     <textarea name="madhat_opts_window" rows="5" class="large-text code"><?php echo esc_textarea(get_option('madhat_opts_window', $def_win)); ?></textarea>
                     <br><br>
-                    
-                    <label><strong>Sisustuskiled (Automaatne lõikuvaru +80mm):</strong></label><br>
+                    <label><strong>Sisustuskiled (Automaatne offset +80mm):</strong></label><br>
                     <textarea name="madhat_opts_interior" rows="5" class="large-text code"><?php echo esc_textarea(get_option('madhat_opts_interior', $def_int)); ?></textarea>
                 </div>
             </div>
-            
             <?php submit_button(); ?>
         </form>
     </div>
@@ -109,7 +95,6 @@ function madhat_render_form() {
     $price_min = get_option('madhat_price_min', 45);
     $price_max = get_option('madhat_price_max', 65);
 
-    // Valmistame andmed ette JS jaoks
     $raw_win = get_option('madhat_opts_window');
     $raw_int = get_option('madhat_opts_interior');
 
@@ -143,21 +128,34 @@ function madhat_render_form() {
         .madhat-mb { margin-bottom: 15px; }
         .madhat-divider { height: 1px; background: #e5e7eb; margin: 25px 0; border: none; }
 
-        /* ITEM CARD STYLE (NEW FOR V2.0) */
+        /* ITEM CARD STYLE V2.1 */
         .item-row {
             background: #f8fafc;
             border: 1px solid #e2e8f0;
             border-radius: 8px;
             padding: 15px;
+            padding-top: 25px; /* Ruumi numbri jaoks */
             margin-bottom: 15px;
             position: relative;
         }
-        .item-header { margin-bottom: 10px; }
+        
+        .row-number {
+            position: absolute;
+            top: 6px;
+            left: 10px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #94a3b8;
+            text-transform: uppercase;
+        }
+
+        /* PC Layout */
         .item-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr 0.7fr 2fr 40px;
+            /* Mat, Name, W, H, Q, Del */
+            grid-template-columns: 2fr 1.5fr 1fr 1fr 0.7fr 40px; 
             gap: 10px;
-            align-items: end;
+            align-items: center;
         }
 
         .madhat-btn { padding: 10px 20px; border: none; cursor: pointer; border-radius: 6px; font-size: 15px; font-weight: 600; transition: all 0.2s; }
@@ -176,7 +174,6 @@ function madhat_render_form() {
         }
         .btn-remove:hover { background-color: #fecaca; }
 
-        /* Summary */
         .madhat-summary { background: #ecfdf5; border: 1px solid #d1fae5; border-radius: 8px; padding: 20px; margin-top: 25px; text-align: center; color: #065f46; }
         .price-range { font-size: 1.8rem; font-weight: 700; display: block; margin: 5px 0; color: #047857; }
         
@@ -187,31 +184,41 @@ function madhat_render_form() {
         .madhat-alert { padding: 15px; margin-bottom: 20px; background: #d1fae5; color: #065f46; border-radius: 8px; text-align: center; border: 1px solid #a7f3d0; }
         .madhat-honey { display: none !important; }
 
-        /* Mobile */
+        /* Mobile Layout V2.1 - Compact 2 Rows */
         @media (max-width: 600px) {
             .madhat-grid-2 { grid-template-columns: 1fr; }
-            .price-range { font-size: 1.4rem; } /* Väiksem font */
+            .price-range { font-size: 1.4rem; }
+            
+            .item-row { padding: 10px; padding-top: 25px; } /* Less padding */
             
             .item-grid {
-                grid-template-columns: 1fr 1fr 1fr; /* 3 col for measures */
+                /* Row 2 cols: Width, Height, Qty, Del */
+                grid-template-columns: 1fr 1fr 0.8fr 35px;
                 grid-template-areas: 
-                    "width height qty"
-                    "name name del";
-                gap: 8px;
+                    "mat mat name name" /* Row 1: Mat & Name share width */
+                    "width height qty del"; /* Row 2: Inputs & button */
+                gap: 6px; /* Tight gap */
             }
+            
+            .grid-mat { grid-area: mat; }
+            .grid-n { grid-area: name; }
             .grid-w { grid-area: width; }
             .grid-h { grid-area: height; }
             .grid-q { grid-area: qty; }
-            .grid-n { grid-area: name; }
             .grid-d { grid-area: del; }
             
             .madhat-wrapper { padding: 20px 10px; }
-            .mobile-label { display: block; font-size: 0.7rem; color: #888; margin-bottom: 2px; }
-            .madhat-input { padding: 8px 4px !important; font-size: 13px; }
-            .btn-remove { height: 35px; margin-top: 15px;} 
-        }
-        @media (min-width: 601px) {
-            .mobile-label { display: none; }
+            
+            /* Hide labels in grid, rely on placeholder */
+            .mobile-label { display: none; } 
+            
+            /* Super compact inputs for mobile */
+            .madhat-input, .madhat-select { 
+                padding: 8px 4px !important; 
+                font-size: 13px; 
+                height: 38px;
+            }
+            .btn-remove { height: 38px; } 
         }
     </style>
 
@@ -243,13 +250,9 @@ function madhat_render_form() {
             <hr class="madhat-divider">
 
             <div class="madhat-mb" style="margin-top:25px;">
-                <label class="madhat-label" style="display:flex; justify-content:space-between;">
-                    Materjalid ja Mõõdud (mm)
-                </label>
-                
+                <label class="madhat-label">Materjalid ja Mõõdud (mm)</label>
                 <div id="madhat-rows"></div>
-                
-                <button type="button" class="madhat-btn btn-add" onclick="addMRow(true)">+ Lisa uus rida (materjal/mõõt)</button>
+                <button type="button" class="madhat-btn btn-add" onclick="addMRow(true)">+ Lisa uus rida</button>
             </div>
 
             <div class="madhat-summary" id="price-box" style="display:none;">
@@ -292,16 +295,16 @@ function madhat_render_form() {
     function buildOptions(selected = '') {
         let html = '<option value="" disabled selected>-- Vali materjal --</option>';
         
-        html += '<optgroup label="Aknakiled (+20mm)">';
+        // NB! Eemaldasime siit (+20mm) tekstid, et oleks puhtam
+        html += '<optgroup label="Aknakiled">';
         WIN_OPTS.forEach(opt => {
-            // Lisame prefixi 'win|', et back-end teaks offsetti arvutada
             const val = 'win|' + opt;
             const isSel = (val === selected) ? 'selected' : '';
             html += `<option value="${val}" ${isSel}>${opt}</option>`;
         });
         html += '</optgroup>';
 
-        html += '<optgroup label="Sisustuskiled (+80mm)">';
+        html += '<optgroup label="Sisustuskiled">';
         INT_OPTS.forEach(opt => {
             const val = 'int|' + opt;
             const isSel = (val === selected) ? 'selected' : '';
@@ -321,9 +324,7 @@ function madhat_render_form() {
             info: document.getElementById('client_info').value,
             items: []
         };
-
-        const rows = document.querySelectorAll('.item-row');
-        rows.forEach(row => {
+        document.querySelectorAll('.item-row').forEach(row => {
             formData.items.push({
                 mat: row.querySelector('.input-mat').value,
                 w: row.querySelector('.input-w').value,
@@ -332,17 +333,13 @@ function madhat_render_form() {
                 l: row.querySelector('.input-l').value
             });
         });
-
         localStorage.setItem('madhat_form_data_v2', JSON.stringify(formData));
         calcPrice();
     }
 
     function restoreState() {
         const saved = localStorage.getItem('madhat_form_data_v2');
-        if (!saved) {
-            addMRow();
-            return;
-        }
+        if (!saved) { addMRow(); return; }
         const data = JSON.parse(saved);
 
         if(data.project_title) document.getElementById('project_title').value = data.project_title;
@@ -374,34 +371,34 @@ function madhat_render_form() {
 
     function calcPrice() {
         let totalSqM = 0;
-        const rows = document.querySelectorAll('.item-row');
-        
-        rows.forEach(row => {
+        document.querySelectorAll('.item-row').forEach(row => {
             const wRaw = row.querySelector('.input-w').value;
             const hRaw = row.querySelector('.input-h').value;
             const q = row.querySelector('.input-q').value;
-
             const w = getRoundedUpVal(wRaw);
             const h = getRoundedUpVal(hRaw);
-
             if (w && h && q) {
-                const area = (w / 1000) * (h / 1000) * q;
-                totalSqM += area;
+                totalSqM += (w / 1000) * (h / 1000) * q;
             }
         });
-
         const box = document.getElementById('price-box');
         const display = document.getElementById('price-display');
-
         if (totalSqM > 0) {
             const minCost = Math.round(totalSqM * PRICE_MIN);
             const maxCost = Math.round(totalSqM * PRICE_MAX);
-            
             display.textContent = `€${minCost} - ${maxCost} + KM`;
             box.style.display = 'block';
         } else {
             box.style.display = 'none';
         }
+    }
+
+    function updateRowNumbers() {
+        const rows = document.querySelectorAll('.item-row');
+        rows.forEach((row, index) => {
+            const numEl = row.querySelector('.row-number');
+            if(numEl) numEl.textContent = 'Nr. ' + (index + 1);
+        });
     }
 
     let rIdx = 0;
@@ -414,25 +411,28 @@ function madhat_render_form() {
         const h = values ? values.h : '';
         const q = values ? values.q : '1';
         const l = values ? values.l : '';
-
+        
         const optionsHtml = buildOptions(mat);
 
         div.innerHTML = `
-            <div class="item-header">
-                <select class="madhat-select input-mat" name="items[${rIdx}][mat]" required onchange="saveState()">
-                    ${optionsHtml}
-                </select>
-            </div>
+            <span class="row-number"></span>
             <div class="item-grid">
-                <div class="grid-w"><span class="mobile-label">Laius</span><input type="number" class="madhat-input input-w" name="items[${rIdx}][w]" value="${w}" placeholder="Laius" required onchange="calcPrice(); saveState()"></div>
-                <div class="grid-h"><span class="mobile-label">Kõrgus</span><input type="number" class="madhat-input input-h" name="items[${rIdx}][h]" value="${h}" placeholder="Kõrgus" required onchange="calcPrice(); saveState()"></div>
-                <div class="grid-q"><span class="mobile-label">Kogus</span><input type="number" class="madhat-input input-q" name="items[${rIdx}][q]" value="${q}" required onchange="calcPrice(); saveState()"></div>
-                <div class="grid-n"><span class="mobile-label">Nimetus</span><input type="text" class="madhat-input input-l" name="items[${rIdx}][l]" value="${l}" placeholder="Nimetus" oninput="saveState()"></div>
-                <div class="grid-d"><button type="button" class="madhat-btn btn-remove" onclick="this.closest('.item-row').remove(); calcPrice(); saveState();">×</button></div>
+                <div class="grid-mat">
+                    <select class="madhat-select input-mat" name="items[${rIdx}][mat]" required onchange="saveState()">
+                        ${optionsHtml}
+                    </select>
+                </div>
+                <div class="grid-n"><input type="text" class="madhat-input input-l" name="items[${rIdx}][l]" value="${l}" placeholder="Nimetus" oninput="saveState()"></div>
+                
+                <div class="grid-w"><input type="number" class="madhat-input input-w" name="items[${rIdx}][w]" value="${w}" placeholder="L (mm)" required onchange="calcPrice(); saveState()"></div>
+                <div class="grid-h"><input type="number" class="madhat-input input-h" name="items[${rIdx}][h]" value="${h}" placeholder="H (mm)" required onchange="calcPrice(); saveState()"></div>
+                <div class="grid-q"><input type="number" class="madhat-input input-q" name="items[${rIdx}][q]" value="${q}" required onchange="calcPrice(); saveState()"></div>
+                <div class="grid-d"><button type="button" class="madhat-btn btn-remove" onclick="this.closest('.item-row').remove(); updateRowNumbers(); calcPrice(); saveState();">×</button></div>
             </div>
         `;
         document.getElementById('madhat-rows').appendChild(div);
         rIdx++;
+        updateRowNumbers(); // Uuenda numbreid
         if(shouldSave) saveState();
     }
 
@@ -459,48 +459,31 @@ function madhat_handle_submit() {
     $items = isset($_POST['items']) ? $_POST['items'] : [];
     
     $csv = "\xEF\xBB\xBFLength,Width,Qty,Label,Enabled\n";
-    
-    $mail_txt = "UUS PÄRING VEEBILEHELT\n\n";
-    $mail_txt .= "PROJEKT: $project\n";
-    $mail_txt .= "Kontaktisik: $contact\n";
-    $mail_txt .= "Email: $email\nTelefon: $phone\n";
-    $mail_txt .= "Lisainfo: $info\n\n";
-    $mail_txt .= "MATERJALID JA MÕÕDUD:\n------------------------------------\n";
+    $mail_txt = "UUS PÄRING VEEBILEHELT\n\nPROJEKT: $project\nKontaktisik: $contact\nEmail: $email\nTelefon: $phone\nLisainfo: $info\n\nMATERJALID JA MÕÕDUD:\n------------------------------------\n";
 
     if (is_array($items)) {
         foreach ($items as $i) {
-            // Analüüsime materjali (win|Nimi või int|Nimi)
             $mat_raw = sanitize_text_field($i['mat']); 
             $parts = explode('|', $mat_raw);
-            
-            // Kui midagi läks katki ja pole valitud, paneme default 'win'
             $mat_type = isset($parts[0]) ? $parts[0] : 'win'; 
             $mat_name = isset($parts[1]) ? $parts[1] : 'Määramata';
-
-            // Määrame offseti
             $offset = ($mat_type === 'int') ? 80 : 20;
 
             $w_raw = floatval($i['w']);
             $h_raw = floatval($i['h']);
-            
-            // Ümardame turvaliselt üles
+            // Safe ümardamine
             $w = ceil($w_raw / 10) * 10;
             $h = ceil($h_raw / 10) * 10;
-            
             $q = intval($i['q']);
             $l = sanitize_text_field($i['l']);
 
             if ($w <= 0 || $h <= 0 || $q <= 0) continue;
 
             $mail_txt .= "- $mat_name: $w x $h mm ($q tk) - $l\n";
-
             $csv_w = $w + $offset;
             $csv_h = $h + $offset;
-            
-            // Paneme materjali nime ka CSV labelisse, et oleks selge
             $full_label = $l . ' (' . $mat_name . ')';
             $l_csv = str_replace('"', '""', $full_label); 
-            
             $csv .= "$csv_h,$csv_w,$q,\"$l_csv\",true\n";
         }
     }
@@ -533,11 +516,7 @@ function madhat_handle_submit() {
     }
 
     $recipient = get_option('madhat_recipient_email', get_option('admin_email'));
-    
-    $headers = [];
-    $headers[] = 'Content-Type: text/plain; charset=UTF-8';
-    $headers[] = 'From: ' . $contact . ' <wordpress@' . $_SERVER['SERVER_NAME'] . '>';
-    $headers[] = 'Reply-To: ' . $email;
+    $headers = ['Content-Type: text/plain; charset=UTF-8', 'From: ' . $contact . ' <wordpress@' . $_SERVER['SERVER_NAME'] . '>', 'Reply-To: ' . $email];
     
     wp_mail($recipient, $project, $mail_txt, $headers, $attachments);
 

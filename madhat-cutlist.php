@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Madhat Cutlist Calculator
  * Description: Kalkulaator hinnavahemiku, materjali valiku ja CSV ekspordiga.
- * Version: 2.6
+ * Version: 2.7
  * Author: Veebmik
  * Author URI: https://veebmik.ee
  * Update URI: https://github.com/ratsepmarkus/madhat-calc
@@ -218,7 +218,7 @@ function madhat_render_form() {
 
         .madhat-label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.9rem; color: #4b5563; }
         .madhat-input, .madhat-select, .madhat-textarea { 
-            width: 100%; padding: 8px 10px !important; 
+            width: 100%; padding: 8px 10px;
             border: 1px solid #d1d5db; border-radius: 6px; font-size: 15px; background-color: #f9fafb;
         }
         .madhat-input:focus, .madhat-select:focus { outline: none; border-color: #2563eb; background-color: #fff; }
@@ -291,33 +291,41 @@ function madhat_render_form() {
             .measurements-header { display: none; } 
             
             /* SHOW LABELS ONLY ON FIRST CHILD ROW */
-            .item-row.first-row .mobile-label { display: block; }
+            .item-row.first-row .mobile-label { display: block; min-height: 15px; } /* min-height added for spacing */
             .item-row:not(.first-row) .mobile-label { display: none; }
             
             .item-row { padding-top: 30px; }
             
+            /* Tight inputs on mobile */
+            .madhat-input, .madhat-select {
+                padding: 6px 4px !important;
+                font-size: 12px !important;
+            }
+
             .item-grid {
                 grid-template-columns: 1fr 1fr 0.8fr 40px;
                 grid-template-areas: 
                     "mat mat name name" 
                     "width height qty del"; 
-                gap: 10px; 
+                gap: 6px; 
             }
             .grid-mat { grid-area: mat; }
             .grid-n { grid-area: name; }
             .grid-w { grid-area: width; }
             .grid-h { grid-area: height; }
             .grid-q { grid-area: qty; }
-            .grid-d { grid-area: del; align-items: flex-end; display: flex; } /* Align bottom */
+            .grid-d { grid-area: del; align-items: flex-end; display: flex; }
             
             .madhat-wrapper { padding: 20px 15px; }
-            .btn-remove { margin-top: auto; height: 38px; }
+            .btn-remove { margin-top: auto; height: 35px; }
 
             .submit-area {
-                flex-direction: column; /* Stack on mobile */
+                /* REVERSE COLUMN for Mobile: Checkbox first, then Button */
+                flex-direction: column-reverse; 
                 align-items: center;
-                gap: 15px;
+                gap: 20px;
             }
+            .btn-submit { width: 100%; text-align: center; }
         }
     </style>
 
@@ -627,7 +635,6 @@ function madhat_handle_submit() {
     $win_data = json_decode(get_option('madhat_json_window'), true);
     $int_data = json_decode(get_option('madhat_json_interior'), true);
     
-    // Abifunktsioon hinna leidmiseks massiivist
     function getPriceRange($name, $dataArr) {
         foreach($dataArr as $row) {
             if($row['name'] === $name) return ['min' => floatval($row['min']), 'max' => floatval($row['max'])];
@@ -638,7 +645,6 @@ function madhat_handle_submit() {
     $total_min = 0;
     $total_max = 0;
     
-    // CSV ettevalmistus
     $csv = "\xEF\xBB\xBFLength,Width,Qty,Material,Label,Enabled\n";
     $mail_body_items = "";
 
@@ -650,7 +656,6 @@ function madhat_handle_submit() {
             $mat_name = isset($parts[1]) ? $parts[1] : 'Määramata';
             $offset = ($mat_type === 'int') ? 80 : 20;
 
-            // Arvutame hinna
             $prices = ($mat_type === 'win') ? getPriceRange($mat_name, $win_data) : getPriceRange($mat_name, $int_data);
 
             $w_cm = floatval(str_replace(',', '.', $i['w']));
@@ -658,12 +663,10 @@ function madhat_handle_submit() {
             $q = intval($i['q']);
             $l = sanitize_text_field($i['l']);
             
-            // Pindala (m2)
             $area = ($w_cm / 100) * ($h_cm / 100) * $q;
             $total_min += $area * $prices['min'];
             $total_max += $area * $prices['max'];
 
-            // CSV ja E-maili mõõdud (mm)
             $w_mm = ceil($w_cm) * 10; 
             $h_mm = ceil($h_cm) * 10;
             
@@ -679,11 +682,9 @@ function madhat_handle_submit() {
         }
     }
     
-    // Lõpphinna arvutus (bufferiga)
     $final_min = round($total_min * (1 + $wastage_pct / 100));
     $final_max = round($total_max * (1 + $wastage_pct / 100));
     
-    // E-maili kokkupanek
     $mail_txt = "UUS PÄRING VEEBILEHELT\n\n";
     $mail_txt .= "TEEMA: $project\n";
     $mail_txt .= "Kontaktisik: $contact\n";

@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Madhat Cutlist Calculator
- * Description: Kalkulaator hinnavahemiku, materjali valiku ja CSV ekspordiga. Seadistatav admin paneelist.
- * Version: 2.0
+ * Description: Kalkulaator hinnavahemiku, materjali valiku ja CSV ekspordiga. (CM sisestus, MM väljund).
+ * Version: 2.5
  * Author: Veebmik
  * Author URI: https://veebmik.ee
  * Update URI: https://github.com/ratsepmarkus/madhat-calc
@@ -31,10 +31,11 @@ if (file_exists($puc_path)) {
 
 function madhat_register_settings() {
     register_setting('madhat_options_group', 'madhat_recipient_email');
-    register_setting('madhat_options_group', 'madhat_price_min');
-    register_setting('madhat_options_group', 'madhat_price_max');
-    register_setting('madhat_options_group', 'madhat_opts_window');
-    register_setting('madhat_options_group', 'madhat_opts_interior');
+    register_setting('madhat_options_group', 'madhat_wastage_percent'); // UUS: Kadu %
+    
+    // Salvestame materjalid JSON kujul
+    register_setting('madhat_options_group', 'madhat_json_window');
+    register_setting('madhat_options_group', 'madhat_json_interior');
 }
 add_action('admin_init', 'madhat_register_settings');
 
@@ -44,47 +45,164 @@ function madhat_add_admin_menu() {
 add_action('admin_menu', 'madhat_add_admin_menu');
 
 function madhat_settings_page_html() {
-    $def_win = "3M Prestige nanokile\nDekoratiiv/Mattkile\nTurvakile\nMuu";
-    $def_int = "Puitimitatsioon\nKiviimitatsioon\nVärviline matt\nNahkimitatsioon\nMuu";
+    // Vaikimisi andmed, kui on tühi
+    $def_win = '[{"name":"3M Prestige nanokile","min":60,"max":80},{"name":"Dekoratiiv/Mattkile","min":30,"max":45},{"name":"Turvakile","min":40,"max":60}]';
+    $def_int = '[{"name":"Puitimitatsioon","min":50,"max":70},{"name":"Kiviimitatsioon","min":50,"max":70},{"name":"Värviline matt","min":35,"max":50}]';
+
+    $val_win = get_option('madhat_json_window', $def_win);
+    $val_int = get_option('madhat_json_interior', $def_int);
+    
+    // Kui kogemata on tühi string, taasta default
+    if(empty($val_win)) $val_win = $def_win;
+    if(empty($val_int)) $val_int = $def_int;
+
     ?>
     <div class="wrap">
         <h1>Madhat Kalkulaatori Seaded</h1>
-        <form method="post" action="options.php">
+        <form method="post" action="options.php" id="madhatAdminForm">
             <?php settings_fields('madhat_options_group'); ?>
             <?php do_settings_sections('madhat_options_group'); ?>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
-                <div>
+            
+            <input type="hidden" name="madhat_json_window" id="input_json_window" value="<?php echo esc_attr($val_win); ?>">
+            <input type="hidden" name="madhat_json_interior" id="input_json_interior" value="<?php echo esc_attr($val_int); ?>">
+
+            <div style="display:grid; grid-template-columns: 1fr; gap:20px; max_width: 800px;">
+                
+                <div style="background:#fff; padding:20px; border:1px solid #ccd0d4; border-radius:4px;">
                     <h3>Üldseaded</h3>
                     <table class="form-table">
                         <tr valign="top">
                             <th scope="row">E-mail(id):</th>
                             <td>
-                                <input type="text" name="madhat_recipient_email" value="<?php echo esc_attr(get_option('madhat_recipient_email')); ?>" class="large-text" />
-                                <p class="description">Eralda komaga.</p>
+                                <input type="text" name="madhat_recipient_email" value="<?php echo esc_attr(get_option('madhat_recipient_email')); ?>" class="large-text" placeholder="info@sinufirma.ee" />
+                                <p class="description">Siia saadetakse päringud.</p>
                             </td>
                         </tr>
                         <tr valign="top">
-                            <th scope="row">Hind (€/m²):</th>
+                            <th scope="row">Materjali kadu (%):</th>
                             <td>
-                                <label>Min: <input type="number" name="madhat_price_min" value="<?php echo esc_attr(get_option('madhat_price_min', 45)); ?>" class="small-text" step="0.1" /> €</label><br>
-                                <label>Max: <input type="number" name="madhat_price_max" value="<?php echo esc_attr(get_option('madhat_price_max', 65)); ?>" class="small-text" step="0.1" /> €</label>
+                                <input type="number" name="madhat_wastage_percent" value="<?php echo esc_attr(get_option('madhat_wastage_percent', 10)); ?>" class="small-text" step="1" /> %
+                                <p class="description">Lisatakse lõpphinnale (buffer).</p>
                             </td>
                         </tr>
                     </table>
                 </div>
-                <div>
-                    <h3>Materjalide valikud</h3>
-                    <p class="description">Kirjuta iga valik <strong>uuele reale</strong>.</p>
-                    <label><strong>Aknakiled (Automaatne offset +20mm):</strong></label><br>
-                    <textarea name="madhat_opts_window" rows="5" class="large-text code"><?php echo esc_textarea(get_option('madhat_opts_window', $def_win)); ?></textarea>
-                    <br><br>
-                    <label><strong>Sisustuskiled (Automaatne offset +80mm):</strong></label><br>
-                    <textarea name="madhat_opts_interior" rows="5" class="large-text code"><?php echo esc_textarea(get_option('madhat_opts_interior', $def_int)); ?></textarea>
+
+                <div style="background:#fff; padding:20px; border:1px solid #ccd0d4; border-radius:4px;">
+                    <h3>Aknakiled (Automaatne offset +20mm)</h3>
+                    <table class="wp-list-table widefat fixed striped" id="table-win">
+                        <thead>
+                            <tr>
+                                <th>Nimetus</th>
+                                <th style="width:100px;">Min €/m²</th>
+                                <th style="width:100px;">Max €/m²</th>
+                                <th style="width:60px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                    <button type="button" class="button action" onclick="addAdminRow('table-win')">+ Lisa rida</button>
                 </div>
+
+                <div style="background:#fff; padding:20px; border:1px solid #ccd0d4; border-radius:4px;">
+                    <h3>Sisustuskiled (Automaatne offset +80mm)</h3>
+                    <table class="wp-list-table widefat fixed striped" id="table-int">
+                        <thead>
+                            <tr>
+                                <th>Nimetus</th>
+                                <th style="width:100px;">Min €/m²</th>
+                                <th style="width:100px;">Max €/m²</th>
+                                <th style="width:60px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                    <button type="button" class="button action" onclick="addAdminRow('table-int')">+ Lisa rida</button>
+                </div>
+
             </div>
+            
+            <br>
             <?php submit_button(); ?>
         </form>
     </div>
+
+    <script>
+    // Laeme algandmed
+    const dataWin = <?php echo $val_win; ?>;
+    const dataInt = <?php echo $val_int; ?>;
+
+    function renderTable(tableId, data) {
+        const tbody = document.querySelector(`#${tableId} tbody`);
+        tbody.innerHTML = '';
+        data.forEach((row, index) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><input type="text" class="regular-text" style="width:100%" value="${row.name}" oninput="updateJson('${tableId}')"></td>
+                <td><input type="number" step="0.1" style="width:100%" value="${row.min}" oninput="updateJson('${tableId}')"></td>
+                <td><input type="number" step="0.1" style="width:100%" value="${row.max}" oninput="updateJson('${tableId}')"></td>
+                <td><button type="button" class="button" onclick="removeRow('${tableId}', ${index})" style="color:#b32d2e;">&times;</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function addAdminRow(tableId) {
+        const tbody = document.querySelector(`#${tableId} tbody`);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><input type="text" class="regular-text" style="width:100%" placeholder="Nimi" oninput="updateJson('${tableId}')"></td>
+            <td><input type="number" step="0.1" style="width:100%" value="0" oninput="updateJson('${tableId}')"></td>
+            <td><input type="number" step="0.1" style="width:100%" value="0" oninput="updateJson('${tableId}')"></td>
+            <td><button type="button" class="button" onclick="this.closest('tr').remove(); updateJson('${tableId}');" style="color:#b32d2e;">&times;</button></td>
+        `;
+        tbody.appendChild(tr);
+        updateJson(tableId);
+    }
+
+    function removeRow(tableId, index) {
+        // Uuendame andmeid ja renderdame uuesti (lihtne viis indexi hoidmiseks)
+        const currentData = scrapeData(tableId);
+        currentData.splice(index, 1);
+        renderTable(tableId, currentData);
+        saveToInput(tableId, currentData);
+    }
+
+    function scrapeData(tableId) {
+        const rows = document.querySelectorAll(`#${tableId} tbody tr`);
+        const data = [];
+        rows.forEach(tr => {
+            const inputs = tr.querySelectorAll('input');
+            if(inputs.length > 0) {
+                data.push({
+                    name: inputs[0].value,
+                    min: inputs[1].value,
+                    max: inputs[2].value
+                });
+            }
+        });
+        return data;
+    }
+
+    function saveToInput(tableId, data) {
+        if(tableId === 'table-win') {
+            document.getElementById('input_json_window').value = JSON.stringify(data);
+        } else {
+            document.getElementById('input_json_interior').value = JSON.stringify(data);
+        }
+    }
+
+    function updateJson(tableId) {
+        const data = scrapeData(tableId);
+        saveToInput(tableId, data);
+    }
+
+    // Init
+    document.addEventListener('DOMContentLoaded', () => {
+        renderTable('table-win', dataWin);
+        renderTable('table-int', dataInt);
+    });
+    </script>
     <?php
 }
 
@@ -92,20 +210,15 @@ function madhat_settings_page_html() {
 // 2. VORMI KUVAMINE
 // ---------------------------------------------------------
 function madhat_render_form() {
-    $price_min = get_option('madhat_price_min', 45);
-    $price_max = get_option('madhat_price_max', 65);
-
-    $raw_win = get_option('madhat_opts_window');
-    $raw_int = get_option('madhat_opts_interior');
-
-    if (empty(trim($raw_win))) $arr_win = ['3M Prestige nanokile', 'Dekoratiiv/Mattkile', 'Turvakile', 'Muu'];
-    else $arr_win = array_filter(array_map('trim', explode("\n", $raw_win)));
-
-    if (empty(trim($raw_int))) $arr_int = ['Puitimitatsioon', 'Kiviimitatsioon', 'Värviline matt', 'Nahkimitatsioon', 'Muu'];
-    else $arr_int = array_filter(array_map('trim', explode("\n", $raw_int)));
-
-    $json_win = json_encode(array_values($arr_win));
-    $json_int = json_encode(array_values($arr_int));
+    $wastage = get_option('madhat_wastage_percent', 10);
+    
+    // Loeme JSON andmed
+    $json_win = get_option('madhat_json_window');
+    $json_int = get_option('madhat_json_interior');
+    
+    // Fallback, kui peaks tühi olema
+    if(empty($json_win)) $json_win = '[]';
+    if(empty($json_int)) $json_int = '[]';
 
     ob_start();
     ?>
@@ -129,6 +242,7 @@ function madhat_render_form() {
         .madhat-mb { margin-bottom: 15px; }
         .madhat-divider { height: 1px; background: #e5e7eb; margin: 25px 0; border: none; }
 
+        /* ITEM CARD STYLE V2.5 */
         .item-row {
             background: #f8fafc;
             border: 1px solid #e2e8f0;
@@ -152,7 +266,6 @@ function madhat_render_form() {
         /* --- DESKTOP LAYOUT (> 1200px) --- */
         .measurements-header {
             display: grid;
-            /* Mat, Name, W, H, Q, Del */
             grid-template-columns: 2fr 1.5fr 1fr 1fr 0.6fr 40px; 
             gap: 10px; margin-bottom: 5px;
         }
@@ -168,14 +281,13 @@ function madhat_render_form() {
         /* Buttons */
         .madhat-btn { padding: 10px 20px; border: none; cursor: pointer; border-radius: 6px; font-size: 15px; font-weight: 600; transition: all 0.2s; }
         .btn-submit { 
-            background-color: #111827; color: #fff; padding: 14px 40px; margin-top: 10px; 
-            display: block; margin-left: auto; margin-right: auto;
+            background-color: #111827; color: #fff; padding: 14px 25px;
+            display: inline-block;
         }
         .btn-submit:hover { background-color: #000; }
         .btn-add { background-color: #e5e7eb; color: #374151; width: 100%; border: 1px solid #d1d5db; padding: 12px; }
         .btn-add:hover { background-color: #d1d5db; }
         
-        /* TRASH ICON BUTTON */
         .btn-remove { 
             background-color: #fee2e2; color: #ef4444; height: 38px; width: 100%; 
             display: flex; align-items: center; justify-content: center; border: 1px solid #fecaca; padding: 0;
@@ -184,12 +296,27 @@ function madhat_render_form() {
         .btn-remove svg { width: 18px; height: 18px; fill: currentColor; }
         .btn-remove:hover { background-color: #fecaca; }
 
+        /* Summary */
         .madhat-summary { background: #ecfdf5; border: 1px solid #d1fae5; border-radius: 8px; padding: 20px; margin-top: 25px; text-align: center; color: #065f46; }
         .price-range { font-size: 1.8rem; font-weight: 700; display: block; margin: 5px 0; color: #047857; }
+
+        /* Confirm & Submit Area */
+        .submit-area {
+            margin-top: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+        .confirm-box { 
+            display: flex; align-items: center; gap: 8px; 
+            font-size: 0.95rem; cursor: pointer;
+        }
+        .confirm-box input { transform: scale(1.2); cursor: pointer; }
         
-        .confirm-wrap { text-align: center; margin-top: 20px; }
-        .confirm-box { display: inline-flex; align-items: center; justify-content: center; gap: 10px; background: #fffbeb; padding: 10px 20px; border-radius: 6px; border: 1px solid #fcd34d; font-size: 0.95rem; }
-        .confirm-box input { transform: scale(1.3); cursor: pointer; }
+        /* Error state for confirm */
+        .confirm-error { color: #dc2626; animation: shake 0.4s; }
+        @keyframes shake { 0% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } 100% { transform: translateX(0); } }
 
         .madhat-alert { padding: 15px; margin-bottom: 20px; background: #d1fae5; color: #065f46; border-radius: 8px; text-align: center; border: 1px solid #a7f3d0; }
         .madhat-honey { display: none !important; }
@@ -200,13 +327,15 @@ function madhat_render_form() {
         /* --- TABLET & MOBILE LAYOUT (< 1200px) --- */
         @media (max-width: 1200px) {
             .madhat-grid-2 { grid-template-columns: 1fr; }
-            .measurements-header { display: none; } /* Hide table header */
-            .mobile-label { display: block; } /* Show labels above inputs */
+            .measurements-header { display: none; } 
+            
+            /* SHOW LABELS ONLY ON FIRST CHILD ROW (JS will toggle classes, but CSS backup) */
+            .item-row.first-row .mobile-label { display: block; }
+            .item-row:not(.first-row) .mobile-label { display: none; }
             
             .item-row { padding-top: 30px; }
             
             .item-grid {
-                /* Row 2 layout: Width | Height | Qty | Delete */
                 grid-template-columns: 1fr 1fr 0.8fr 40px;
                 grid-template-areas: 
                     "mat mat name name" 
@@ -222,9 +351,12 @@ function madhat_render_form() {
             .grid-d { grid-area: del; }
             
             .madhat-wrapper { padding: 20px 15px; }
-            
-            /* Align delete button to bottom of inputs */
-            .btn-remove { margin-top: 17px; height: 38px; }
+            .btn-remove { margin-top: auto; height: 38px; } /* Auto margin aligns bottom */
+
+            .submit-area {
+                flex-direction: column;
+                gap: 15px;
+            }
         }
     </style>
 
@@ -237,7 +369,7 @@ function madhat_render_form() {
             <script>localStorage.removeItem('madhat_form_data_v2');</script>
         <?php endif; ?>
 
-        <form action="<?php echo esc_url(admin_url('admin-post.php')); ?>" method="post" enctype="multipart/form-data" id="madhatForm">
+        <form action="<?php echo esc_url(admin_url('admin-post.php')); ?>" method="post" enctype="multipart/form-data" id="madhatForm" onsubmit="return validateForm()">
             <input type="hidden" name="action" value="madhat_submit_form">
             <?php wp_nonce_field('madhat_verify', 'madhat_nonce'); ?>
             <input type="text" name="madhat_robot_check" class="madhat-honey" value="">
@@ -245,7 +377,7 @@ function madhat_render_form() {
             <div class="madhat-header"><h3>Hinnapäring</h3></div>
 
             <div class="madhat-grid-2">
-                <div><label class="madhat-label">Projekti pealkiri</label><input type="text" class="madhat-input" name="project_title" id="project_title" required placeholder="nt. Korteri sisustus"></div>
+                <div><label class="madhat-label">Teema</label><input type="text" class="madhat-input" name="project_title" id="project_title" required placeholder="nt. Korteri sisustus"></div>
                 <div><label class="madhat-label">Nimi (Kontaktisik)</label><input type="text" class="madhat-input" name="contact_name" id="contact_name" required placeholder="Sinu nimi"></div>
             </div>
             <div class="madhat-grid-2">
@@ -256,13 +388,13 @@ function madhat_render_form() {
             <hr class="madhat-divider">
 
             <div class="madhat-mb" style="margin-top:25px;">
-                <label class="madhat-label">Materjalid ja Mõõdud (mm)</label>
+                <label class="madhat-label">Materjalid ja Mõõdud (cm)</label>
                 
                 <div class="measurements-header">
                     <label>Materjal</label>
                     <label>Pinna nimetus</label>
-                    <label>Laius</label>
-                    <label>Kõrgus</label>
+                    <label>Laius (cm)</label>
+                    <label>Kõrgus (cm)</label>
                     <label>Kogus</label>
                     <label></label>
                 </div>
@@ -280,7 +412,7 @@ function madhat_render_form() {
 
             <div class="madhat-mb">
                 <label class="madhat-label">Lisainfo</label>
-                <textarea name="client_info" id="client_info" class="madhat-textarea" rows="3" placeholder="Täpsustavad soovid / objekti asukoht / tellingu vajadus..." oninput="saveState()"></textarea>
+                <textarea name="client_info" id="client_info" class="madhat-textarea" rows="3" placeholder="Kaaspaketi tüüp / asukoht / ligipääs..." oninput="saveState()"></textarea>
             </div>
             
             <div class="madhat-mb">
@@ -288,44 +420,47 @@ function madhat_render_form() {
                 <input type="file" name="client_files[]" multiple style="font-size:0.9em; padding:10px 0;">
             </div>
 
-            <div class="confirm-wrap">
-                <div class="confirm-box">
-                    <input type="checkbox" name="confirm_measurements" required>
-                    <label>Kinnitan mõõtude täpsuse +/- 1cm</label>
-                </div>
-            </div>
-
-            <div style="margin-top:20px;">
+            <div class="submit-area">
+                <label class="confirm-box" id="confirm-label">
+                    <input type="checkbox" name="confirm_measurements" id="confirm_check" required>
+                    <span>Kinnitan mõõtude täpsuse +/- 1cm</span>
+                </label>
+                
                 <button type="submit" class="madhat-btn btn-submit">SAADA PÄRING</button>
             </div>
         </form>
     </div>
 
     <script>
-    const PRICE_MIN = <?php echo esc_js($price_min); ?>; 
-    const PRICE_MAX = <?php echo esc_js($price_max); ?>;
+    const WASTAGE_PCT = <?php echo floatval($wastage); ?>;
     
-    const WIN_OPTS = <?php echo $json_win; ?>;
-    const INT_OPTS = <?php echo $json_int; ?>;
+    // Laeme dünaamilised andmed admin paneelist
+    const WIN_DATA = <?php echo $json_win; ?>;
+    const INT_DATA = <?php echo $json_int; ?>;
 
     function buildOptions(selected = '') {
         let html = '<option value="" disabled selected>-- Vali materjal --</option>';
+        
         html += '<optgroup label="Aknakiled">';
-        WIN_OPTS.forEach(opt => {
-            const val = 'win|' + opt;
+        WIN_DATA.forEach(row => {
+            // Lisame data-min ja data-max otse optioni sisse
+            const val = 'win|' + row.name;
             const isSel = (val === selected) ? 'selected' : '';
-            html += `<option value="${val}" ${isSel}>${opt}</option>`;
+            html += `<option value="${val}" data-min="${row.min}" data-max="${row.max}" ${isSel}>${row.name}</option>`;
         });
         html += '</optgroup>';
+
         html += '<optgroup label="Sisustuskiled">';
-        INT_OPTS.forEach(opt => {
-            const val = 'int|' + opt;
+        INT_DATA.forEach(row => {
+            const val = 'int|' + row.name;
             const isSel = (val === selected) ? 'selected' : '';
-            html += `<option value="${val}" ${isSel}>${opt}</option>`;
+            html += `<option value="${val}" data-min="${row.min}" data-max="${row.max}" ${isSel}>${row.name}</option>`;
         });
         html += '</optgroup>';
         return html;
     }
+
+    // --- LOGIC ---
 
     function saveState() {
         const formData = {
@@ -375,53 +510,91 @@ function madhat_render_form() {
         document.getElementById(id).addEventListener('input', saveState);
     });
 
-    function getRoundedUpVal(val) {
+    // See tagastab numbri täis-sentimeetrites
+    function getCleanCm(val) {
         if(!val) return 0;
-        let v = parseInt(val);
-        return Math.ceil(v / 10) * 10;
+        let v = parseFloat(val.replace(',', '.')); // Luba koma
+        return Math.ceil(v); // Ümarda üles täis CM-ni
     }
 
     function calcPrice() {
-        let totalSqM = 0;
+        let minTotal = 0;
+        let maxTotal = 0;
+        let hasArea = false;
+
         document.querySelectorAll('.item-row').forEach(row => {
-            const wRaw = row.querySelector('.input-w').value;
-            const hRaw = row.querySelector('.input-h').value;
-            const q = row.querySelector('.input-q').value;
-            const w = getRoundedUpVal(wRaw);
-            const h = getRoundedUpVal(hRaw);
-            if (w && h && q) {
-                totalSqM += (w / 1000) * (h / 1000) * q;
+            const wVal = row.querySelector('.input-w').value;
+            const hVal = row.querySelector('.input-h').value;
+            const qVal = row.querySelector('.input-q').value;
+            const matSelect = row.querySelector('.input-mat');
+            
+            // Leiame hinnad data-atribuutidest
+            const option = matSelect.options[matSelect.selectedIndex];
+            const pMin = option ? parseFloat(option.getAttribute('data-min') || 0) : 0;
+            const pMax = option ? parseFloat(option.getAttribute('data-max') || 0) : 0;
+
+            const w = getCleanCm(wVal);
+            const h = getCleanCm(hVal);
+            const q = parseInt(qVal) || 0;
+
+            if (w > 0 && h > 0 && q > 0) {
+                hasArea = true;
+                // Arvutame ruutmeetrid (cm -> m)
+                const area = (w / 100) * (h / 100) * q;
+                
+                minTotal += area * pMin;
+                maxTotal += area * pMax;
             }
         });
+
         const box = document.getElementById('price-box');
         const display = document.getElementById('price-display');
-        if (totalSqM > 0) {
-            const minCost = Math.round(totalSqM * PRICE_MIN);
-            const maxCost = Math.round(totalSqM * PRICE_MAX);
-            display.textContent = `€${minCost} - ${maxCost} + KM`;
+
+        if (hasArea && maxTotal > 0) {
+            // Lisame materjali kadu (%)
+            const finalMin = Math.round(minTotal * (1 + WASTAGE_PCT / 100));
+            const finalMax = Math.round(maxTotal * (1 + WASTAGE_PCT / 100));
+            
+            display.textContent = `€${finalMin} - ${finalMax} + KM`;
             box.style.display = 'block';
         } else {
             box.style.display = 'none';
         }
     }
 
-    function updateRowNumbers() {
-        document.querySelectorAll('.item-row').forEach((row, index) => {
+    function updateRowUI() {
+        const rows = document.querySelectorAll('.item-row');
+        rows.forEach((row, index) => {
+            // Numbrid
             const numEl = row.querySelector('.row-number');
             if(numEl) numEl.textContent = 'Nr. ' + (index + 1);
+            
+            // Mobiili sildid (ainult esimene rida)
+            if (index === 0) row.classList.add('first-row');
+            else row.classList.remove('first-row');
         });
     }
 
     let rIdx = 0;
     function addMRow(shouldSave = true, values = null) {
+        // SMART COPY: Vaatame eelmist rida
+        let defaultMat = '';
+        let defaultName = '';
+        const rows = document.querySelectorAll('.item-row');
+        if (rows.length > 0 && !values) {
+            const lastRow = rows[rows.length - 1];
+            defaultMat = lastRow.querySelector('.input-mat').value;
+            defaultName = lastRow.querySelector('.input-l').value; // Kopeerime ka nime
+        }
+
         const div = document.createElement('div');
         div.className = 'item-row';
         
-        const mat = values ? values.mat : '';
+        const mat = values ? values.mat : defaultMat;
         const w = values ? values.w : '';
         const h = values ? values.h : '';
         const q = values ? values.q : '1';
-        const l = values ? values.l : '';
+        const l = values ? values.l : defaultName;
         
         const optionsHtml = buildOptions(mat);
 
@@ -433,7 +606,7 @@ function madhat_render_form() {
             <div class="item-grid">
                 <div class="grid-mat">
                     <span class="mobile-label">Materjal</span>
-                    <select class="madhat-select input-mat" name="items[${rIdx}][mat]" required onchange="saveState()">
+                    <select class="madhat-select input-mat" name="items[${rIdx}][mat]" required onchange="saveState(); calcPrice();">
                         ${optionsHtml}
                     </select>
                 </div>
@@ -443,26 +616,37 @@ function madhat_render_form() {
                 </div>
                 
                 <div class="grid-w">
-                    <span class="mobile-label">Laius (mm)</span>
-                    <input type="number" class="madhat-input input-w" name="items[${rIdx}][w]" value="${w}" placeholder="Laius (mm)" required onchange="calcPrice(); saveState()">
+                    <span class="mobile-label">Laius (cm)</span>
+                    <input type="number" step="0.1" class="madhat-input input-w" name="items[${rIdx}][w]" value="${w}" placeholder="nt 135,5" required onchange="calcPrice(); saveState()">
                 </div>
                 <div class="grid-h">
-                    <span class="mobile-label">Kõrgus (mm)</span>
-                    <input type="number" class="madhat-input input-h" name="items[${rIdx}][h]" value="${h}" placeholder="Kõrgus (mm)" required onchange="calcPrice(); saveState()">
+                    <span class="mobile-label">Kõrgus (cm)</span>
+                    <input type="number" step="0.1" class="madhat-input input-h" name="items[${rIdx}][h]" value="${h}" placeholder="nt 210" required onchange="calcPrice(); saveState()">
                 </div>
                 <div class="grid-q">
                     <span class="mobile-label">Kogus</span>
                     <input type="number" class="madhat-input input-q" name="items[${rIdx}][q]" value="${q}" required onchange="calcPrice(); saveState()">
                 </div>
                 <div class="grid-d">
-                    <button type="button" class="madhat-btn btn-remove" onclick="this.closest('.item-row').remove(); updateRowNumbers(); calcPrice(); saveState();">${trashSvg}</button>
+                    <button type="button" class="madhat-btn btn-remove" onclick="this.closest('.item-row').remove(); updateRowUI(); calcPrice(); saveState();">${trashSvg}</button>
                 </div>
             </div>
         `;
         document.getElementById('madhat-rows').appendChild(div);
         rIdx++;
-        updateRowNumbers();
+        updateRowUI();
         if(shouldSave) saveState();
+    }
+    
+    // Checkbox validation visual
+    function validateForm() {
+        const cb = document.getElementById('confirm_check');
+        if(!cb.checked) {
+            document.getElementById('confirm-label').classList.add('confirm-error');
+            setTimeout(() => document.getElementById('confirm-label').classList.remove('confirm-error'), 500);
+            return false;
+        }
+        return true;
     }
 
     document.addEventListener('DOMContentLoaded', restoreState);
@@ -488,7 +672,7 @@ function madhat_handle_submit() {
     $items = isset($_POST['items']) ? $_POST['items'] : [];
     
     $csv = "\xEF\xBB\xBFLength,Width,Qty,Material,Label,Enabled\n";
-    $mail_txt = "UUS PÄRING VEEBILEHELT\n\nPROJEKT: $project\nKontaktisik: $contact\nEmail: $email\nTelefon: $phone\nLisainfo: $info\n\nMATERJALID JA MÕÕDUD:\n------------------------------------\n";
+    $mail_txt = "UUS PÄRING VEEBILEHELT\n\nTEEMA: $project\nKontaktisik: $contact\nEmail: $email\nTelefon: $phone\nLisainfo: $info\n\nMATERJALID JA MÕÕDUD (teisendatud mm-ks):\n------------------------------------\n";
 
     if (is_array($items)) {
         foreach ($items as $i) {
@@ -498,18 +682,25 @@ function madhat_handle_submit() {
             $mat_name = isset($parts[1]) ? $parts[1] : 'Määramata';
             $offset = ($mat_type === 'int') ? 80 : 20;
 
-            $w_raw = floatval($i['w']);
-            $h_raw = floatval($i['h']);
-            $w = ceil($w_raw / 10) * 10;
-            $h = ceil($h_raw / 10) * 10;
+            // Sisend on CM (koma asendatud punktiga)
+            $w_cm = floatval(str_replace(',', '.', $i['w']));
+            $h_cm = floatval(str_replace(',', '.', $i['h']));
+            
+            // Teisendus MM-iks ja ümardamine üles täis-sentimeetrini (safe)
+            // Nt 139.1 cm -> ceil(139.1) = 140 cm -> 1400 mm
+            $w_mm = ceil($w_cm) * 10; 
+            $h_mm = ceil($h_cm) * 10;
+            
             $q = intval($i['q']);
             $l = sanitize_text_field($i['l']);
 
-            if ($w <= 0 || $h <= 0 || $q <= 0) continue;
+            if ($w_mm <= 0 || $h_mm <= 0 || $q <= 0) continue;
 
-            $mail_txt .= "- $mat_name: $w x $h mm ($q tk) - $l\n";
-            $csv_w = $w + $offset;
-            $csv_h = $h + $offset;
+            $mail_txt .= "- $mat_name: $w_mm x $h_mm mm ($q tk) - $l\n";
+            
+            // CSV jaoks lisame offseti (lõikuvaru)
+            $csv_w = $w_mm + $offset;
+            $csv_h = $h_mm + $offset;
             
             $l_csv = str_replace('"', '""', $l); 
             $mat_csv = str_replace('"', '""', $mat_name);

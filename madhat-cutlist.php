@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Madhat Cutlist Calculator
  * Description: Kalkulaator hinnavahemiku, materjali valiku ja CSV ekspordiga.
- * Version: 2.7.2
+ * Version: 2.7.3
  * Author: Veebmik
  * Author URI: https://veebmik.ee
  * Update URI: https://github.com/ratsepmarkus/madhat-calc
@@ -290,13 +290,11 @@ function madhat_render_form() {
             .madhat-grid-2 { grid-template-columns: 1fr; }
             .measurements-header { display: none; } 
             
-            /* SHOW LABELS ONLY ON FIRST CHILD ROW */
             .item-row.first-row .mobile-label { display: block; min-height: 15px; } 
             .item-row:not(.first-row) .mobile-label { display: none; }
             
             .item-row { padding-top: 30px; }
             
-            /* Tight inputs on mobile */
             .madhat-input, .madhat-select {
                 padding: 6px 4px !important;
                 font-size: 12px !important;
@@ -320,7 +318,6 @@ function madhat_render_form() {
             .btn-remove { margin-top: auto; height: 35px; }
 
             .submit-area {
-                /* REVERSE COLUMN for Mobile: Checkbox first, then Button */
                 flex-direction: column-reverse; 
                 align-items: center;
                 gap: 20px;
@@ -488,7 +485,6 @@ function madhat_render_form() {
         document.getElementById(id).addEventListener('input', saveState);
     });
 
-    // UUS: AINULT TÄISARVUD
     function getCleanCm(val) {
         if(!val) return 0;
         // Eemaldame kõik mis pole number
@@ -549,7 +545,6 @@ function madhat_render_form() {
         if (rows.length > 0 && !values) {
             const lastRow = rows[rows.length - 1];
             defaultMat = lastRow.querySelector('.input-mat').value;
-            // Nime ei kopeeri
         }
 
         const div = document.createElement('div');
@@ -563,7 +558,6 @@ function madhat_render_form() {
         const optionsHtml = buildOptions(mat);
         const trashSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2C12.5523 2 13 2.44772 13 3V4H19C19.5523 4 20 4.44772 20 5C20 5.55228 19.5523 6 19 6H5C4.44772 6 4 5.55228 4 5C4 4.44772 4.44772 4 5 4H11V3C11 2.44772 11.4477 2 12 2ZM6 8V20C6 21.1046 6.89543 22 8 22H16C17.1046 22 18 21.1046 18 20V8H6ZM9 10C9.55228 10 10 10.4477 10 11V19C10 19.5523 9.55228 20 9 20C8.44772 20 8 19.5523 8 19V11C8 10.4477 8.44772 10 9 10ZM15 10C15.5523 10 16 10.4477 16 11V19C16 19.5523 15.5523 20 15 20C14.4477 20 14 19.5523 14 19V11C14 10.4477 14.4477 10 15 10Z"></path></svg>`;
 
-        // UUS: step="1" ja blokeeritud punkt ja koma
         div.innerHTML = `
             <span class="row-number"></span>
             <div class="item-grid">
@@ -575,15 +569,15 @@ function madhat_render_form() {
                 </div>
                 <div class="grid-n">
                     <span class="mobile-label">Pinna nimetus</span>
-                    <input type="text" class="madhat-input input-l" name="items[${rIdx}][l]" value="${l}" placeholder="nt. Köögi aken" oninput="saveState()">
+                    <input type="text" class="madhat-input input-l" name="items[${rIdx}][l]" value="${l}" placeholder="Nimetus" oninput="saveState()">
                 </div>
                 <div class="grid-w">
                     <span class="mobile-label">Laius (cm)</span>
-                    <input type="number" step="1" class="madhat-input input-w" name="items[${rIdx}][w]" value="${w}" placeholder="nt 135" required onkeydown="return event.key !== ',' && event.key !== '.'" onchange="calcPrice(); saveState()" oninvalid="this.setCustomValidity('Palun täida see väli')" oninput="this.setCustomValidity('')">
+                    <input type="number" step="1" class="madhat-input input-w" name="items[${rIdx}][w]" value="${w}" placeholder="Laius" required onkeydown="return event.key !== ',' && event.key !== '.'" onchange="calcPrice(); saveState()" oninvalid="this.setCustomValidity('Palun täida see väli')" oninput="this.setCustomValidity('')">
                 </div>
                 <div class="grid-h">
                     <span class="mobile-label">Kõrgus (cm)</span>
-                    <input type="number" step="1" class="madhat-input input-h" name="items[${rIdx}][h]" value="${h}" placeholder="nt 210" required onkeydown="return event.key !== ',' && event.key !== '.'" onchange="calcPrice(); saveState()" oninvalid="this.setCustomValidity('Palun täida see väli')" oninput="this.setCustomValidity('')">
+                    <input type="number" step="1" class="madhat-input input-h" name="items[${rIdx}][h]" value="${h}" placeholder="Kõrgus" required onkeydown="return event.key !== ',' && event.key !== '.'" onchange="calcPrice(); saveState()" oninvalid="this.setCustomValidity('Palun täida see väli')" oninput="this.setCustomValidity('')">
                 </div>
                 <div class="grid-q">
                     <span class="mobile-label">Kogus</span>
